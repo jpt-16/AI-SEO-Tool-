@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* Tokens from jtbuildsco.com's "Nocturne" system: quiet dark UI, Inter capped at 500,
+   one blurple accent used as a line or glow, outlined buttons, rules that fade out. */
+@theme {
+  --color-bg: #161826;
+  --color-surface: #232332;
+  --color-ink: #ededf1;
+  --color-soft: #d3d3dc;
+  --color-subtle: #b4b4c2;
+  --color-muted: #9494a6;
+  --color-line: rgb(237 237 241 / 0.14);
+  --color-line-strong: rgb(237 237 241 / 0.28);
+
+  --color-accent-100: #edebfa;
+  --color-accent-200: #d6d2f2;
+  --color-accent-300: #b7afe8;
+  --color-accent-400: #9f95e0;
+  --color-accent-500: #9184d9;
+  --color-accent-600: #7a6dc4;
+  --color-accent-700: #5f54a0;
+  --color-accent-800: #443c74;
+  --color-accent-900: #2b2650;
+
+  --color-danger: #e6a396;
+  --color-danger-line: #b8685a;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --shadow-panel: 0 0 0 1px rgb(237 237 241 / 0.14), 0 2px 10px rgb(0 0 0 / 0.35);
+}
+
+@layer base {
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent-400);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--color-accent-500);
+  }
+
+  .panel {
+    border-radius: 14px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 8px;
+    border: 1px solid var(--color-line-strong);
+    background: transparent;
+    color: var(--color-soft);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.3s, color 0.3s, border-color 0.3s;
+  }
+  .btn:hover {
+    border-color: var(--color-subtle);
+    color: var(--color-ink);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: progress;
+  }
+  .btn-accent {
+    border-color: var(--color-accent-500);
+    color: var(--color-accent-500);
+  }
+  .btn-accent:hover {
+    background: rgb(145 132 217 / 0.12);
+    border-color: var(--color-accent-400);
+    color: var(--color-accent-400);
+  }
+  .btn-danger {
+    border-color: var(--color-danger-line);
+    color: var(--color-danger);
+  }
+  .btn-danger:hover {
+    background: rgb(184 104 90 / 0.12);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+  }
+
+  .rule-bottom,
+  .rule-right {
+    position: relative;
+  }
+  .rule-bottom::after,
+  .rule-right::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+  .rule-bottom::after {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-line-strong) 48px, var(--color-line-strong) calc(100% - 48px), transparent);
+  }
+  .rule-right::after {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(180deg, transparent, var(--color-line-strong) 48px, var(--color-line-strong) calc(100% - 48px), transparent);
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--color-line-strong);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+}
