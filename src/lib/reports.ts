@@ -40,24 +40,15 @@ export async function getOverview(siteId: string): Promise<Overview | null> {
 
 export type ReportTab = "queries" | "pages";
 
-export interface ReportRow {
-  key: string;
-  secondary: string | null;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
+interface Paging {
+  window: DateWindow;
+  search: string;
+  limit: number;
+  offset: number;
 }
 
-export async function getReport(
-  siteId: string,
-  tab: ReportTab,
-  window: DateWindow,
-  search: string,
-  limit: number,
-  offset: number,
-): Promise<{ rows: ReportRow[]; total: number }> {
-  const { data, error } = await db().rpc(tab === "queries" ? "gsc_query_report" : "gsc_page_report", {
+async function callReport(fn: string, siteId: string, { window, search, limit, offset }: Paging) {
+  const { data, error } = await db().rpc(fn, {
     p_site_id: siteId,
     p_start: window.startDate,
     p_end: window.endDate,
@@ -66,16 +57,95 @@ export async function getReport(
     p_offset: offset,
   });
   if (error) throw error;
-  const raw = (data ?? []) as Array<Record<string, string | number | null>>;
+  const raw = (data ?? []) as Array<Record<string, unknown>>;
+  return { raw, total: Number(raw[0]?.total_count ?? 0) };
+}
+
+export interface QueryRow {
+  query: string;
+  topPage: string | null;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export async function getQueryReport(siteId: string, paging: Paging): Promise<{ rows: QueryRow[]; total: number }> {
+  const { raw, total } = await callReport("gsc_query_report", siteId, paging);
   return {
-    total: Number(raw[0]?.total_count ?? 0),
+    total,
     rows: raw.map((r) => ({
-      key: String(tab === "queries" ? r.query : r.page),
-      secondary: (tab === "queries" ? r.top_page : r.top_query) as string | null,
+      query: String(r.query),
+      topPage: (r.top_page as string | null) ?? null,
       clicks: Number(r.clicks),
       impressions: Number(r.impressions),
       ctr: Number(r.ctr ?? 0),
       position: Number(r.position ?? 0),
+    })),
+  };
+}
+
+export interface PageQuery {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number;
+}
+
+export interface PageRow {
+  pageKey: string;
+  url: string;
+  clicks: number;
+  impressions: number;
+  ctr: number | null;
+  position: number | null;
+  topQueries: PageQuery[];
+  // Null when the crawler hasn't seen this page (e.g. only Search Console knows it).
+  crawl: {
+    title: string | null;
+    metaDescription: string | null;
+    h1: string[];
+    wordCount: number | null;
+    internalLinkCount: number | null;
+    schemaTypes: string[];
+    inSitemap: boolean;
+    statusCode: number | null;
+    error: string | null;
+    crawledAt: string;
+  } | null;
+}
+
+export async function getPageReport(siteId: string, paging: Paging): Promise<{ rows: PageRow[]; total: number }> {
+  const { raw, total } = await callReport("gsc_page_seo_report", siteId, paging);
+  return {
+    total,
+    rows: raw.map((r) => ({
+      pageKey: String(r.page_key),
+      url: String(r.url),
+      clicks: Number(r.clicks),
+      impressions: Number(r.impressions),
+      ctr: r.ctr === null ? null : Number(r.ctr),
+      position: r.position === null ? null : Number(r.position),
+      topQueries: ((r.top_queries as PageQuery[] | null) ?? []).map((q) => ({
+        query: q.query,
+        clicks: Number(q.clicks),
+        impressions: Number(q.impressions),
+        position: Number(q.position),
+      })),
+      crawl: r.crawled_at
+        ? {
+            title: (r.title as string | null) ?? null,
+            metaDescription: (r.meta_description as string | null) ?? null,
+            h1: (r.h1 as string[] | null) ?? [],
+            wordCount: (r.word_count as number | null) ?? null,
+            internalLinkCount: (r.internal_link_count as number | null) ?? null,
+            schemaTypes: (r.schema_types as string[] | null) ?? [],
+            inSitemap: Boolean(r.in_sitemap),
+            statusCode: (r.status_code as number | null) ?? null,
+            error: (r.crawl_error as string | null) ?? null,
+            crawledAt: String(r.crawled_at),
+          }
+        : null,
     })),
   };
 }

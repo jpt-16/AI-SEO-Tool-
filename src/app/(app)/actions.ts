@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { runSiteCrawl } from "@/lib/crawl-run";
 import { decryptSecret } from "@/lib/crypto";
 import { requireEnv } from "@/lib/env";
 import { describeGoogleError, getConnection, gscRequester, oauthClient } from "@/lib/google";
@@ -55,6 +56,14 @@ export async function runSync(_prev: ActionState | null, formData: FormData): Pr
   return result.ok
     ? { ok: true, message: `Synced ${result.rowsFetched.toLocaleString("en-US")} rows.` }
     : { ok: false, message: result.error ?? "Sync failed." };
+}
+
+export async function runCrawl(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
+  const result = await runSiteCrawl(String(formData.get("siteId") ?? ""), "manual");
+  revalidatePath("/", "layout");
+  if (!result.ok) return { ok: false, message: result.error ?? "Crawl failed." };
+  const failed = result.pagesFailed ? `, ${result.pagesFailed} failed` : "";
+  return { ok: true, message: `Crawled ${result.pagesCrawled} pages${failed}.` };
 }
 
 export async function disconnectGoogle() {

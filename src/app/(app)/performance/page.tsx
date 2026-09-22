@@ -1,29 +1,33 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SyncButton } from "@/components/SyncButton";
+import { ActionButton } from "@/components/ActionButton";
+import { PageList, QueryTable } from "@/components/ReportTables";
+import { getLatestCrawl, type CrawlRun } from "@/lib/crawl-run";
 import { formatCompact, formatDate, formatDateTime, formatInt, formatPct, formatPosition } from "@/lib/format";
 import { getConnection } from "@/lib/google";
 import { percentChange, type Totals } from "@/lib/metrics";
-import { getOverview, getRecentRuns, getReport, type ReportRow, type ReportTab } from "@/lib/reports";
+import { getOverview, getPageReport, getQueryReport, getRecentRuns, type ReportTab } from "@/lib/reports";
 import { getCurrentSite } from "@/lib/sites";
 
 export const maxDuration = 60;
 
 const PAGE_SIZE = 25;
 
-function pathOf(url: string) {
-  try {
-    const u = new URL(url);
-    return `${u.pathname}${u.search}`;
-  } catch {
-    return url;
+function CrawlBar({ siteId, crawl }: { siteId: string; crawl: CrawlRun | null }) {
+  let status: string;
+  if (!crawl) status = "Not crawled yet. Crawl the site to pull each page’s title, meta description and headings.";
+  else if (crawl.status === "running") status = `Crawl started ${formatDateTime(crawl.started_at)}…`;
+  else if (crawl.status === "failed") status = `Last crawl failed ${formatDateTime(crawl.started_at)}: ${crawl.error}`;
+  else {
+    const failed = crawl.pages_failed ? ` · ${crawl.pages_failed} failed` : "";
+    status = `Last crawled ${formatDateTime(crawl.finished_at ?? crawl.started_at)} · ${crawl.pages_crawled} pages${failed}`;
   }
-}
-
-function positionTone(position: number) {
-  if (position <= 3) return "bg-accent-900 text-accent-200 border-accent-800";
-  if (position <= 10) return "text-accent-300 border-accent-700";
-  return "text-muted border-line";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-3">
+      <span className={`text-[13px] ${crawl?.status === "failed" ? "text-danger" : "text-muted"}`}>{status}</span>
+      <ActionButton kind="crawl" siteId={siteId} label={crawl ? "Crawl again" : "Crawl site"} accent={!crawl} />
+    </div>
+  );
 }
 
 function Delta({ text, good }: { text: string; good: boolean }) {
@@ -83,48 +87,6 @@ function KpiRow({ current, prior }: { current: Totals; prior: Totals | null }) {
   );
 }
 
-function ReportTable({ tab, rows }: { tab: ReportTab; rows: ReportRow[] }) {
-  const headings = tab === "queries" ? ["Query", "Top landing page"] : ["Page URL", "Top query"];
-  return (
-    <table className="w-full border-collapse text-sm">
-      <thead>
-        <tr className="text-left text-[10.5px] tracking-[0.2em] text-muted uppercase">
-          <th scope="col" className="px-6 py-3.5 font-medium">{headings[0]}</th>
-          <th scope="col" className="px-6 py-3.5 font-medium">{headings[1]}</th>
-          <th scope="col" className="px-6 py-3.5 text-right font-medium">Clicks</th>
-          <th scope="col" className="px-6 py-3.5 text-right font-medium">Impressions</th>
-          <th scope="col" className="px-6 py-3.5 text-right font-medium">CTR</th>
-          <th scope="col" className="px-6 py-3.5 text-right font-medium">Position</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => {
-          const primary = tab === "queries" ? row.key : pathOf(row.key);
-          const secondary = row.secondary && (tab === "queries" ? pathOf(row.secondary) : row.secondary);
-          return (
-            <tr key={row.key} className="border-t border-line">
-              <td className="px-6 py-3.5 font-medium break-all" title={row.key}>{primary}</td>
-              <td className="px-6 py-3.5 text-[13px] break-all text-muted" title={row.secondary ?? undefined}>
-                {secondary}
-              </td>
-              <td className="px-6 py-3.5 text-right font-medium tabular-nums">{formatInt(row.clicks)}</td>
-              <td className="px-6 py-3.5 text-right text-soft tabular-nums">{formatInt(row.impressions)}</td>
-              <td className="px-6 py-3.5 text-right text-soft tabular-nums">{formatPct(row.ctr)}</td>
-              <td className="px-6 py-3.5 text-right">
-                <span
-                  className={`inline-block min-w-11 rounded border px-2 py-0.5 text-center text-[12.5px] font-medium tabular-nums ${positionTone(row.position)}`}
-                >
-                  {formatPosition(row.position)}
-                </span>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
 export default async function PerformancePage({ searchParams }: PageProps<"/performance">) {
   const params = await searchParams;
   const tab: ReportTab = params.tab === "pages" ? "pages" : "queries";
@@ -137,10 +99,17 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
     return <p className="text-muted">No client sites yet. Add one to the <code>sites</code> table in Supabase.</p>;
   }
 
-  const [overview, runs] = await Promise.all([getOverview(site.id), getRecentRuns(site.id, 10)]);
-  const report = overview
-    ? await getReport(site.id, tab, overview.window, search, PAGE_SIZE, (pageNumber - 1) * PAGE_SIZE)
-    : null;
+  const [overview, runs, crawl] = await Promise.all([
+    getOverview(site.id),
+    getRecentRuns(site.id, 10),
+    getLatestCrawl(site.id),
+  ]);
+  const paging = overview && { window: overview.window, search, limit: PAGE_SIZE, offset: (pageNumber - 1) * PAGE_SIZE };
+  const report = !paging
+    ? null
+    : tab === "queries"
+      ? { tab, ...(await getQueryReport(site.id, paging)) }
+      : { tab, ...(await getPageReport(site.id, paging)) };
   const lastSuccess = runs.find((r) => r.status === "succeeded");
   const latest = runs[0];
 
@@ -190,7 +159,7 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
               Export CSV
             </a>
           )}
-          <SyncButton siteId={site.id} disabled={!site.gsc_property} />
+          <ActionButton kind="sync" siteId={site.id} label="Sync now" disabled={!site.gsc_property} />
         </div>
       </header>
 
@@ -245,16 +214,20 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
                   name="q"
                   type="search"
                   defaultValue={search}
-                  placeholder={tab === "queries" ? "Query contains…" : "URL contains…"}
+                  placeholder={tab === "queries" ? "Query contains…" : "URL or title contains…"}
                   className="min-h-10 w-64 border-0 border-b border-line-strong bg-transparent px-0.5 py-2 text-[15px] text-ink placeholder:text-muted/70 focus:border-accent-500 focus:outline-none"
                 />
               </form>
             </div>
 
-            {report.rows.length ? (
-              <ReportTable tab={tab} rows={report.rows} />
-            ) : (
+            {report.tab === "pages" && <CrawlBar siteId={site.id} crawl={crawl} />}
+
+            {report.rows.length === 0 ? (
               <p className="px-6 py-10 text-sm text-muted">No {tab} match “{search}”.</p>
+            ) : report.tab === "queries" ? (
+              <QueryTable rows={report.rows} />
+            ) : (
+              <PageList rows={report.rows} />
             )}
 
             <div className="mt-auto flex items-center justify-between border-t border-line px-6 py-4 text-[13px] text-muted">

@@ -1,6 +1,6 @@
 import { CheckIcon } from "@/components/icons";
 import { PropertyForm } from "@/components/PropertyForm";
-import { SyncButton } from "@/components/SyncButton";
+import { ActionButton } from "@/components/ActionButton";
 import { formatDate, formatDateTime, formatInt } from "@/lib/format";
 import { describeGoogleError, getConnection, GSC_SCOPE, gscRequester } from "@/lib/google";
 import { listSites as listGscProperties, type GscSiteEntry } from "@/lib/gsc";
@@ -159,7 +159,7 @@ export default async function ConnectionsPage({ searchParams }: PageProps<"/conn
                   {site.sync_enabled ? "Turn off" : "Turn on"}
                 </button>
               </form>
-              <SyncButton siteId={site.id} label="Run sync now" disabled={!site.gsc_property} />
+              <ActionButton kind="sync" siteId={site.id} label="Run sync now" disabled={!site.gsc_property} />
             </div>
           </section>
         </div>
