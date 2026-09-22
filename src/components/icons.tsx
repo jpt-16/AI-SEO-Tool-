@@ -62,3 +62,10 @@ export const CheckIcon = (p: P) => (
     <path d="M20 6 9 17l-5-5" />
   </Icon>
 );
+export const ClipboardIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="6" y="4" width="12" height="17" rx="2" />
+    <path d="M9 4.5V3h6v1.5" />
+    <path d="m9 13 2 2 4-4" />
+  </Icon>
+);

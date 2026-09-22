@@ -58,6 +58,7 @@ Copy `.env.example` to `.env.local` and fill it in:
 | `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Your login for the app |
 | `CRON_SECRET` | `openssl rand -hex 32` |
+| `ANTHROPIC_API_KEY` | From console.anthropic.com → API Keys (Blueprints feature) |
 
 ### 4. Run it
 
@@ -117,6 +118,32 @@ curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" -X POST https://<domain>/api/crawl   #
 Or click **Crawl site** on the Pages tab. The Pages tab shows every page's Search Console stats and top
 queries next to its current title, meta description, H1 and content facts. Query words that don't appear
 in the page's title are underlined.
+
+## Blueprints (AI review)
+
+`src/lib/blueprints.ts` asks Claude (`claude-sonnet-4-6`, via the Messages API with adaptive thinking)
+to review each page people are finding. For every page with more than 20 impressions in the last 90
+days (adjustable) that the crawler has seen, it sends the page's title, meta description, H1/H2s, word
+count, schema types and its top 5 queries (impressions, clicks, CTR, position). Claude returns
+structured JSON, enforced with a Zod schema through `messages.parse()`:
+
+```json
+{ "blueprint": { "finding": "…", "reasoning": "…", "proposed_title": "…" | null,
+                 "proposed_meta": "…" | null, "priority": "high" | "med" | "low" } | null }
+```
+
+`blueprint: null` means there's nothing worth changing. The prompt tells Claude that's a good outcome,
+so it doesn't manufacture recommendations. Each finding becomes a row in `blueprints` (`status` open /
+done / skipped, `created_at`, `status_changed_at`, plus a `page_snapshot` of exactly what Claude saw).
+A page with an open blueprint is skipped on later runs, and every run is logged in `blueprint_runs`.
+
+Needs `ANTHROPIC_API_KEY`. Run it from the **Blueprints** page (**Analyze pages**, up to 10 pages per
+click) or with the script:
+
+```bash
+npm run blueprints -- --dry-run                     # list qualifying pages, no API calls
+npm run blueprints -- --min-impressions=10 --max-pages=5
+```
 
 ## Adding another client
 

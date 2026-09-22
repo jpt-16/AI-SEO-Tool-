@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { DEFAULT_MIN_IMPRESSIONS, runBlueprints } from "@/lib/blueprints";
 import { runSiteCrawl } from "@/lib/crawl-run";
 import { decryptSecret } from "@/lib/crypto";
 import { requireEnv } from "@/lib/env";
@@ -64,6 +65,40 @@ export async function runCrawl(_prev: ActionState | null, formData: FormData): P
   if (!result.ok) return { ok: false, message: result.error ?? "Crawl failed." };
   const failed = result.pagesFailed ? `, ${result.pagesFailed} failed` : "";
   return { ok: true, message: `Crawled ${result.pagesCrawled} pages${failed}.` };
+}
+
+export async function generateBlueprints(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
+  const minImpressions = Math.max(0, Math.floor(Number(formData.get("minImpressions") ?? DEFAULT_MIN_IMPRESSIONS)));
+  if (!Number.isFinite(minImpressions)) return { ok: false, message: "Minimum impressions must be a number." };
+  const result = await runBlueprints(String(formData.get("siteId") ?? ""), "manual", { minImpressions, maxPages: 10 });
+  revalidatePath("/blueprints");
+  if (!result.ok) return { ok: false, message: result.error ?? "Analysis failed." };
+  if (result.pagesConsidered === 0) {
+    return { ok: true, message: `No pages have more than ${minImpressions} impressions yet. Try a lower minimum.` };
+  }
+  const skipped = result.outcomes.filter((o) => o.outcome === "skipped").length;
+  const errors = result.outcomes.filter((o) => o.outcome === "error").length;
+  const parts = [`Analyzed ${result.pagesAnalyzed} pages`, `${result.blueprintsCreated} new blueprints`];
+  if (skipped) parts.push(`${skipped} already open`);
+  if (errors) parts.push(`${errors} failed`);
+  return { ok: true, message: `${parts.join(" · ")}.` };
+}
+
+const BLUEPRINT_STATUSES = ["open", "done", "skipped"] as const;
+
+export async function setBlueprintStatus(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const status = String(formData.get("status"));
+  if (!Number.isInteger(id) || !BLUEPRINT_STATUSES.includes(status as (typeof BLUEPRINT_STATUSES)[number])) {
+    throw new Error("Invalid blueprint update.");
+  }
+  const { error } = await db()
+    .from("blueprints")
+    .update({ status, status_changed_at: status === "open" ? null : new Date().toISOString() })
+    .eq("id", id);
+  // Reopening fails if the page got a new open blueprint since; leave it as is.
+  if (error && error.code !== "23505") throw error;
+  revalidatePath("/blueprints");
 }
 
 export async function disconnectGoogle() {

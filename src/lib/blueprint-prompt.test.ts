@@ -1,0 +1,98 @@
+import { describe, expect, it } from "vitest";
+import { BlueprintOutput, buildUserPrompt, selectPages, SYSTEM_PROMPT, type PageSnapshot } from "./blueprint-prompt";
+import type { PageRow } from "./reports";
+
+const snapshot: PageSnapshot = {
+  url: "https://cloverdownsdetailing.com/mobile-detailing/hamilton",
+  window: { startDate: "2026-06-23", endDate: "2026-09-20" },
+  title: "Mobile Detailing in Hamilton, MA — Clover Downs Detailing",
+  metaDescription: null,
+  h1: ["Mobile detailing in Hamilton."],
+  h2: ["What we do", "Service area"],
+  wordCount: 951,
+  schemaTypes: ["AutoDetailing", "FAQPage"],
+  clicks: 1,
+  impressions: 42,
+  position: 18.25,
+  topQueries: [{ query: "detailing hamilton", clicks: 1, impressions: 20, ctr: 0.05, position: 9.5 }],
+};
+
+describe("buildUserPrompt", () => {
+  const prompt = buildUserPrompt({ name: "Clover Downs Detailing", domain: "cloverdownsdetailing.com" }, snapshot);
+
+  it("includes the page data with lengths, missing fields and query stats", () => {
+    expect(prompt).toContain("Title tag: Mobile Detailing in Hamilton, MA — Clover Downs Detailing (57 chars)");
+    expect(prompt).toContain("Meta description: (missing)");
+    expect(prompt).toContain("H2s: What we do | Service area");
+    expect(prompt).toContain('1. "detailing hamilton": 20 impressions, 1 clicks, CTR 5.0%, avg position 9.5');
+    expect(prompt).toContain("Page totals: 42 impressions, 1 clicks, avg position 18.3");
+  });
+
+  it("tells the model an empty result is acceptable", () => {
+    expect(SYSTEM_PROMPT).toContain('{"blueprint": null}');
+    expect(SYSTEM_PROMPT).toMatch(/never manufacture a recommendation/);
+  });
+});
+
+describe("BlueprintOutput", () => {
+  it("accepts an empty result and a full blueprint", () => {
+    expect(BlueprintOutput.parse({ blueprint: null }).blueprint).toBeNull();
+    const full = {
+      blueprint: {
+        finding: "Title misses the term people search.",
+        reasoning: "20 impressions for 'detailing hamilton' at 9.5.",
+        proposed_title: "Car Detailing in Hamilton, MA | Clover Downs",
+        proposed_meta: null,
+        priority: "high",
+      },
+    };
+    expect(BlueprintOutput.parse(full)).toEqual(full);
+  });
+
+  it("rejects priorities outside high/med/low", () => {
+    expect(() =>
+      BlueprintOutput.parse({
+        blueprint: { finding: "x", reasoning: "y", proposed_title: null, proposed_meta: null, priority: "urgent" },
+      }),
+    ).toThrow();
+  });
+});
+
+describe("selectPages", () => {
+  const row = (url: string, impressions: number, crawl: Partial<NonNullable<PageRow["crawl"]>> | null): PageRow => ({
+    pageKey: url,
+    url,
+    clicks: 0,
+    impressions,
+    ctr: 0,
+    position: 10,
+    topQueries: [],
+    crawl: crawl && {
+      title: "t",
+      metaDescription: "m",
+      h1: [],
+      wordCount: 100,
+      internalLinkCount: 1,
+      schemaTypes: [],
+      inSitemap: true,
+      statusCode: 200,
+      error: null,
+      crawledAt: "2026-09-22T00:00:00Z",
+      ...crawl,
+    },
+  });
+
+  it("keeps crawled pages above the threshold, busiest first", () => {
+    const picked = selectPages(
+      [
+        row("a", 25, {}),
+        row("b", 20, {}), // not more than 20
+        row("c", 90, {}),
+        row("d", 50, null), // never crawled
+        row("e", 60, { error: "HTTP 404" }),
+      ],
+      20,
+    );
+    expect(picked.map((p) => p.url)).toEqual(["c", "a"]);
+  });
+});
