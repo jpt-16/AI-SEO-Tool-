@@ -6,8 +6,9 @@ export async function GET() {
   const state = randomBytes(24).toString("base64url");
   const url = oauthClient().generateAuthUrl({
     access_type: "offline",
-    // Forces a refresh token even if this account connected before.
-    prompt: "consent",
+    // select_account: always show the chooser when several Google accounts are signed in.
+    // consent: forces a refresh token even if this account connected before.
+    prompt: "select_account consent",
     scope: OAUTH_SCOPES,
     state,
   });
