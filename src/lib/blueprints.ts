@@ -9,9 +9,10 @@ import {
   noPagesReason,
   selectPages,
   SYSTEM_PROMPT,
-  type BlueprintResult,
+  type BlueprintAnswer,
   type PageSnapshot,
 } from "./blueprint-prompt";
+import { pickTargetQueries, sortResults, type ResultDiff, type StatsSnapshot } from "./attribution-core";
 import { runSiteCrawl } from "./crawl-run";
 import { getOverview, getPageReport } from "./reports";
 import { db } from "./supabase";
@@ -33,6 +34,8 @@ export interface PageOutcome {
   page_key: string;
   url: string;
   outcome: "blueprint" | "none" | "error" | "skipped";
+  // Claude's reason when the outcome is "none".
+  reason?: string;
   error?: string;
 }
 
@@ -51,7 +54,7 @@ export async function analyzePage(
   client: Pick<Anthropic, "messages">,
   business: { name: string; domain: string },
   snapshot: PageSnapshot,
-): Promise<BlueprintResult | null> {
+): Promise<BlueprintAnswer> {
   const response = await client.messages.parse({
     model: BLUEPRINT_MODEL,
     max_tokens: 16000,
@@ -63,7 +66,7 @@ export async function analyzePage(
   if (response.stop_reason === "refusal") throw new Error("Claude declined to analyze this page.");
   if (response.stop_reason === "max_tokens") throw new Error("Claude's answer was cut off (max_tokens).");
   if (!response.parsed_output) throw new Error("Claude's answer didn't match the blueprint format.");
-  return response.parsed_output.blueprint;
+  return response.parsed_output;
 }
 
 async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -168,13 +171,15 @@ export async function runBlueprints(
       };
       const base = { page_key: page.pageKey, url: page.url };
       try {
-        const blueprint = await analyzePage(client, site, snapshot);
-        if (!blueprint) return { ...base, outcome: "none" };
+        const { blueprint, no_change_reason } = await analyzePage(client, site, snapshot);
+        if (!blueprint) return { ...base, outcome: "none", ...(no_change_reason ? { reason: no_change_reason } : {}) };
+        const { target_queries, ...fields } = blueprint;
         const { error } = await db().from("blueprints").insert({
           site_id: siteId,
           page_key: page.pageKey,
           url: page.url,
-          ...blueprint,
+          ...fields,
+          target_queries: pickTargetQueries(target_queries, snapshot.topQueries.map((q) => q.query)),
           page_snapshot: snapshot,
           model: BLUEPRINT_MODEL,
           run_id: run.id,
@@ -230,6 +235,12 @@ export interface Blueprint {
   model: string;
   created_at: string;
   status_changed_at: string | null;
+  target_queries: string[] | null;
+  done_at: string | null;
+  baseline_snapshot: StatsSnapshot | null;
+  result_snapshot: StatsSnapshot | null;
+  result_diff: ResultDiff | null;
+  result_at: string | null;
 }
 
 const PRIORITY_ORDER = { high: 0, med: 1, low: 2 } as const;
@@ -263,6 +274,18 @@ export async function countBlueprints(siteId: string): Promise<Record<BlueprintS
   return counts;
 }
 
+// Done blueprints for the Results view: measured ones by biggest click gain, then pending.
+export async function listResults(siteId: string): Promise<Blueprint[]> {
+  const { data, error } = await db()
+    .from("blueprints")
+    .select("*")
+    .eq("site_id", siteId)
+    .eq("status", "done")
+    .limit(500);
+  if (error) throw error;
+  return sortResults(data as Blueprint[]);
+}
+
 export interface BlueprintRun {
   status: "running" | "succeeded" | "failed";
   min_impressions: number;
@@ -270,6 +293,7 @@ export interface BlueprintRun {
   pages_analyzed: number | null;
   blueprints_created: number | null;
   error: string | null;
+  results: PageOutcome[];
   started_at: string;
   finished_at: string | null;
 }
@@ -277,7 +301,7 @@ export interface BlueprintRun {
 export async function getLatestBlueprintRun(siteId: string): Promise<BlueprintRun | null> {
   const { data, error } = await db()
     .from("blueprint_runs")
-    .select("status, min_impressions, pages_considered, pages_analyzed, blueprints_created, error, started_at, finished_at")
+    .select("status, min_impressions, pages_considered, pages_analyzed, blueprints_created, error, results, started_at, finished_at")
     .eq("site_id", siteId)
     .order("started_at", { ascending: false })
     .limit(1)

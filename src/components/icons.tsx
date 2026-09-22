@@ -69,3 +69,11 @@ export const ClipboardIcon = (p: P) => (
     <path d="m9 13 2 2 4-4" />
   </Icon>
 );
+export const CompareIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 20V10" />
+    <path d="M9 20V4" />
+    <path d="M15 20v-7" />
+    <path d="M20 20V8" />
+  </Icon>
+);

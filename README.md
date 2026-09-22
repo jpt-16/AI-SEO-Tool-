@@ -27,7 +27,7 @@ Styled with the "Nocturne" tokens from jtbuildsco.com.
 ### 1. Supabase
 
 1. Create a project (or reuse one).
-2. Run `supabase/migrations/20260922000000_gsc_connector.sql` — paste it into the SQL Editor, or
+2. Run the files in `supabase/migrations/` in order — paste each into the SQL Editor, or
    `supabase link` + `supabase db push`. It creates the tables, two report functions, and a
    `sites` row for Clover Downs Detailing.
 3. From **Project Settings → API**, copy the project URL and the **service role / secret** key.
@@ -129,11 +129,15 @@ structured JSON, enforced with a Zod schema through `messages.parse()`:
 
 ```json
 { "blueprint": { "finding": "…", "reasoning": "…", "proposed_title": "…" | null,
-                 "proposed_meta": "…" | null, "priority": "high" | "med" | "low" } | null }
+                 "proposed_meta": "…" | null, "priority": "high" | "med" | "low",
+                 "target_queries": ["…"] } | null,
+  "no_change_reason": "…" | null }
 ```
 
 `blueprint: null` means there's nothing worth changing. The prompt tells Claude that's a good outcome,
-so it doesn't manufacture recommendations. Each finding becomes a row in `blueprints` (`status` open /
+so it doesn't manufacture recommendations. Claude then gives a one-sentence `no_change_reason`, stored in
+the run's `results` and listed under the last run on the Blueprints page. `target_queries` are the queries
+the change is aimed at; any Claude cites that aren't in the data it saw are dropped. Each finding becomes a row in `blueprints` (`status` open /
 done / skipped, `created_at`, `status_changed_at`, plus a `page_snapshot` of exactly what Claude saw).
 A page with an open blueprint is skipped on later runs, and every run is logged in `blueprint_runs`.
 
@@ -144,6 +148,24 @@ click) or with the script:
 npm run blueprints -- --dry-run                     # list qualifying pages, no API calls
 npm run blueprints -- --min-impressions=10 --max-pages=5
 ```
+
+## Results (attribution)
+
+`src/lib/attribution.ts` measures whether a finished blueprint moved anything:
+
+1. **Mark done** records `done_at` and a `baseline_snapshot`: clicks, impressions and
+   impression-weighted average position for the page's target queries (combined and one by one) and for
+   the whole page, over the 14 days before the change (or up to the last synced day).
+2. **Every Search Console sync** (the daily cron, **Sync now**, or `POST /api/gsc/sync`) then looks for done
+   blueprints without a `result_snapshot`. Once synced data covers the first 14 full days after the day
+   it was marked done (so about 16 days later, given Search Console's 2-day lag), it stores the same numbers
+   for that window as `result_snapshot`, plus `result_diff` (before / after / change) and `result_at`.
+3. The **Results** page lists done blueprints by the biggest click increase on the targeted queries. Ones
+   still waiting show their before numbers and the date the after window completes. The numbers are shown
+   as they are, with no scoring.
+
+Both snapshots come from the `blueprint_stats()` SQL function over the synced `gsc_search_analytics` rows,
+so they're computed the same way. Reopening or skipping a done blueprint clears its measurement.
 
 ## Adding another client
 

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartIcon, ClipboardIcon, LinkIcon, SearchIcon } from "./icons";
+import { ChartIcon, ClipboardIcon, CompareIcon, LinkIcon, SearchIcon } from "./icons";
 
 const LINKS = [
   { href: "/performance", label: "Search performance", Icon: ChartIcon },
   { href: "/blueprints", label: "Blueprints", Icon: ClipboardIcon },
+  { href: "/results", label: "Results", Icon: CompareIcon },
   { href: "/connections", label: "Connections", Icon: LinkIcon },
 ];
 

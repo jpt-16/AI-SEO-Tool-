@@ -1,4 +1,5 @@
 import "server-only";
+import { collectBlueprintResults } from "./attribution";
 import { priorWindow, syncWindow } from "./dates";
 import { describeGoogleError, gscRequester } from "./google";
 import { querySearchAnalytics, type GscApiRow } from "./gsc";
@@ -14,6 +15,8 @@ export interface SyncResult {
   rowsFetched: number;
   startDate: string;
   endDate: string;
+  // Done blueprints whose after-numbers this sync completed.
+  blueprintResults?: number;
   error?: string;
 }
 
@@ -82,6 +85,15 @@ export async function syncSite(siteId: string, trigger: SyncTrigger, now = new D
     result.rowsFetched = rows.length;
   } catch (err) {
     result.error = describeGoogleError(err);
+  }
+
+  if (result.ok) {
+    try {
+      result.blueprintResults = await collectBlueprintResults(siteId);
+    } catch (err) {
+      // The sync itself worked; results are picked up again on the next one.
+      console.error("Recording blueprint results failed", err);
+    }
   }
 
   await db()

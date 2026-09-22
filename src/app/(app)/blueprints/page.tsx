@@ -126,7 +126,14 @@ function BlueprintCard({ blueprint: b }: { blueprint: Blueprint }) {
             <StatusButton id={b.id} status="skipped" label="Skip" />
           </>
         ) : (
-          <StatusButton id={b.id} status="open" label="Reopen" />
+          <>
+            {b.status === "done" && (
+              <Link href="/results" className="btn btn-accent min-h-11 w-full sm:w-auto">
+                See results
+              </Link>
+            )}
+            <StatusButton id={b.id} status="open" label="Reopen" />
+          </>
         )}
       </div>
     </article>
@@ -143,11 +150,34 @@ function LastRun({ run }: { run: BlueprintRun | null }) {
       </p>
     );
   }
+  const unchanged = run.results.filter((o) => o.outcome === "none");
   return (
-    <p className="text-[13px] text-muted">
-      Last analysis {formatDateTime(run.finished_at ?? run.started_at)} · {run.pages_analyzed ?? 0} pages over{" "}
-      {run.min_impressions} impressions · {run.blueprints_created ?? 0} new blueprints
-    </p>
+    <div className="flex flex-col gap-3">
+      <p className="text-[13px] text-muted">
+        Last analysis {formatDateTime(run.finished_at ?? run.started_at)} · {run.pages_analyzed ?? 0} pages over{" "}
+        {run.min_impressions} impressions · {run.blueprints_created ?? 0} new blueprints
+      </p>
+      {unchanged.length > 0 && (
+        <details className="group border-t border-line pt-3 text-[13px]">
+          <summary className="cursor-pointer list-none text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">Why {unchanged.length} pages got no blueprint ▸</span>
+            <span className="hidden group-open:inline">Hide ▾</span>
+          </summary>
+          <ul className="mt-3 flex flex-col gap-3">
+            {unchanged.map((o) => (
+              <li key={o.page_key} className="flex flex-col gap-0.5">
+                <a href={o.url} target="_blank" rel="noreferrer" className="font-medium break-all text-ink no-underline hover:text-accent-400">
+                  {pathOf(o.url)}
+                </a>
+                <span className="leading-relaxed text-soft">
+                  {o.reason ?? "No reason recorded. Runs before this feature didn't ask for one; analyze again to get it."}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -173,7 +203,8 @@ export default async function BlueprintsPage({ searchParams }: PageProps<"/bluep
         <p className="max-w-2xl text-[15px] leading-relaxed text-muted">
           For each page people are finding, Claude compares its title and meta description with the searches it shows up
           for and proposes the single change most likely to win clicks. Pages with nothing worth changing get no
-          blueprint.
+          blueprint. Mark a blueprint done once the change is live on the site; its before and after numbers appear
+          under Results.
         </p>
       </header>
 

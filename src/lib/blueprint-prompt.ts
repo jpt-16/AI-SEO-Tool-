@@ -12,12 +12,20 @@ export const BlueprintOutput = z.object({
       proposed_title: z.string().nullable().describe("Full replacement title tag, or null to keep the current one."),
       proposed_meta: z.string().nullable().describe("Full replacement meta description, or null to keep the current one."),
       priority: z.enum(["high", "med", "low"]),
+      target_queries: z
+        .array(z.string())
+        .describe("The queries from the list that this change is meant to win clicks on, copied exactly."),
     })
     .nullable()
     .describe("The single highest-leverage change, or null when there is no real mismatch."),
+  no_change_reason: z
+    .string()
+    .nullable()
+    .describe("When blueprint is null: one sentence on why, citing the data. Null when there is a blueprint."),
 });
 
-export type BlueprintResult = NonNullable<z.infer<typeof BlueprintOutput>["blueprint"]>;
+export type BlueprintAnswer = z.infer<typeof BlueprintOutput>;
+export type BlueprintResult = NonNullable<BlueprintAnswer["blueprint"]>;
 
 export interface SnapshotQuery {
   query: string;
@@ -62,8 +70,10 @@ Rules for the recommendation:
 - Base every claim on the data provided. Don't invent services, locations, prices, reviews or facts; the headings show what the page actually covers.
 - Proposed titles stay under 60 characters and meta descriptions under 155. Write for people, so the result earns the click, and keep the brand name if the current title has it.
 - Set proposed_title or proposed_meta to null when that element should stay as it is.
+- target_queries lists the queries from the data this change targets, copied exactly as given. The result is measured on them later.
 - priority: high = a clear mismatch on queries with real impressions at page 1-2 positions, likely to gain clicks soon; med = a clear improvement with modest volume; low = minor polish.
-- If the title and meta already fit the demand, or the data is too thin to justify a change, return {"blueprint": null}. An empty result is a good outcome; never manufacture a recommendation to have something to say.`;
+- If the title and meta already fit the demand, or the data is too thin to justify a change, set blueprint to null. An empty result is a good outcome; never manufacture a recommendation to have something to say.
+- With a null blueprint, give no_change_reason: one plain sentence naming the specific data behind the decision (for example, which queries, how many impressions, what position). With a blueprint, no_change_reason is null.`;
 
 const fmtLen = (text: string | null) => (text ? `${text} (${text.length} chars)` : "(missing)");
 

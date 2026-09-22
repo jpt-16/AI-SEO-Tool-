@@ -31,7 +31,7 @@ async function main() {
     console.log(`${site.domain}: pages with more than ${minImpressions} impressions${dryRun ? " (dry run)" : ""}`);
     const result = await runBlueprints(site.id, "script", { minImpressions, maxPages, dryRun });
     for (const o of result.outcomes) {
-      console.log(`  ${o.outcome.padEnd(9)} ${o.url}${o.error ? `  (${o.error})` : ""}`);
+      console.log(`  ${o.outcome.padEnd(9)} ${o.url}${o.error ? `  (${o.error})` : ""}${o.reason ? `\n            ${o.reason}` : ""}`);
     }
     if (result.note) console.log(`  ${result.note}`);
     if (!result.ok) {

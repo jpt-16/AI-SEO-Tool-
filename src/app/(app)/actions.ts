@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { markBlueprintDone } from "@/lib/attribution";
 import { DEFAULT_MIN_IMPRESSIONS, runBlueprints } from "@/lib/blueprints";
 import { runSiteCrawl } from "@/lib/crawl-run";
 import { decryptSecret } from "@/lib/crypto";
@@ -54,8 +55,9 @@ export async function setSyncEnabled(formData: FormData) {
 export async function runSync(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
   const result = await syncSite(String(formData.get("siteId") ?? ""), "manual");
   revalidatePath("/", "layout");
+  const results = result.blueprintResults ? ` Recorded results for ${result.blueprintResults} blueprints.` : "";
   return result.ok
-    ? { ok: true, message: `Synced ${result.rowsFetched.toLocaleString("en-US")} rows.` }
+    ? { ok: true, message: `Synced ${result.rowsFetched.toLocaleString("en-US")} rows.${results}` }
     : { ok: false, message: result.error ?? "Sync failed." };
 }
 
@@ -90,13 +92,27 @@ export async function setBlueprintStatus(formData: FormData) {
   if (!Number.isInteger(id) || !BLUEPRINT_STATUSES.includes(status as (typeof BLUEPRINT_STATUSES)[number])) {
     throw new Error("Invalid blueprint update.");
   }
-  const { error } = await db()
-    .from("blueprints")
-    .update({ status, status_changed_at: status === "open" ? null : new Date().toISOString() })
-    .eq("id", id);
-  // Reopening fails if the page got a new open blueprint since; leave it as is.
-  if (error && error.code !== "23505") throw error;
+  if (status === "done") {
+    await markBlueprintDone(id);
+  } else {
+    // Leaving "done" discards the measurement; marking it done again starts a new one.
+    const { error } = await db()
+      .from("blueprints")
+      .update({
+        status,
+        status_changed_at: status === "open" ? null : new Date().toISOString(),
+        done_at: null,
+        baseline_snapshot: null,
+        result_snapshot: null,
+        result_diff: null,
+        result_at: null,
+      })
+      .eq("id", id);
+    // Reopening fails if the page got a new open blueprint since; leave it as is.
+    if (error && error.code !== "23505") throw error;
+  }
   revalidatePath("/blueprints");
+  revalidatePath("/results");
 }
 
 export async function disconnectGoogle() {

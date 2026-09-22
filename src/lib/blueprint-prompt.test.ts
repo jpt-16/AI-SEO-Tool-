@@ -38,14 +38,16 @@ describe("buildUserPrompt", () => {
   });
 
   it("tells the model an empty result is acceptable", () => {
-    expect(SYSTEM_PROMPT).toContain('{"blueprint": null}');
+    expect(SYSTEM_PROMPT).toMatch(/set blueprint to null/);
     expect(SYSTEM_PROMPT).toMatch(/never manufacture a recommendation/);
+    expect(SYSTEM_PROMPT).toMatch(/no_change_reason/);
   });
 });
 
 describe("BlueprintOutput", () => {
   it("accepts an empty result and a full blueprint", () => {
-    expect(BlueprintOutput.parse({ blueprint: null }).blueprint).toBeNull();
+    const empty = { blueprint: null, no_change_reason: "Only 3 impressions, all at position 70+." };
+    expect(BlueprintOutput.parse(empty)).toEqual(empty);
     const full = {
       blueprint: {
         finding: "Title misses the term people search.",
@@ -53,7 +55,9 @@ describe("BlueprintOutput", () => {
         proposed_title: "Car Detailing in Hamilton, MA | Clover Downs",
         proposed_meta: null,
         priority: "high",
+        target_queries: ["detailing hamilton"],
       },
+      no_change_reason: null,
     };
     expect(BlueprintOutput.parse(full)).toEqual(full);
   });
@@ -61,7 +65,8 @@ describe("BlueprintOutput", () => {
   it("rejects priorities outside high/med/low", () => {
     expect(() =>
       BlueprintOutput.parse({
-        blueprint: { finding: "x", reasoning: "y", proposed_title: null, proposed_meta: null, priority: "urgent" },
+        blueprint: { finding: "x", reasoning: "y", proposed_title: null, proposed_meta: null, priority: "urgent", target_queries: [] },
+        no_change_reason: null,
       }),
     ).toThrow();
   });
