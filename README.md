@@ -92,6 +92,32 @@ curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" -X POST "https://<domain>/api/gsc/sync
 Returns `{ results: [{ siteId, ok, rowsFetched, startDate, endDate, error? }] }`, with HTTP 502 if any
 site failed.
 
+## Crawler
+
+`src/lib/crawl.ts` crawls a client site with `fetch` + Cheerio (every client site so far is
+server-rendered, so no headless browser is needed). It seeds from the sitemap (found via `robots.txt`,
+or `/sitemap.xml`) plus the homepage, follows internal links to catch pages missing from the sitemap,
+and respects `robots.txt` rules for `User-agent: *`. For each page it stores the title tag, meta
+description, all H1/H2 text, visible word count, internal link count and every JSON-LD block in
+`crawl_pages`.
+
+Rows are keyed by `(site_id, page_key)`. `page_key` is a normalized URL (no scheme, `www.`, query,
+fragment or trailing slash), computed by the same `public.page_key()` function on
+`gsc_search_analytics`, so `https://www.site.com/x/` in Search Console joins to the crawled
+`https://site.com/x`. Re-running a crawl updates each page's row; it never adds duplicates.
+
+Run it any of three ways:
+
+```bash
+npm run crawl                               # every site (reads .env.local; needs Node 22+)
+npm run crawl -- cloverdownsdetailing.com   # one site
+curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" -X POST https://<domain>/api/crawl   # deployed app
+```
+
+Or click **Crawl site** on the Pages tab. The Pages tab shows every page's Search Console stats and top
+queries next to its current title, meta description, H1 and content facts. Query words that don't appear
+in the page's title are underlined.
+
 ## Adding another client
 
 ```sql

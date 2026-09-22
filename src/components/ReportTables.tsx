@@ -90,10 +90,11 @@ function OnPageText({ text, max, missing }: { text: string | null; max?: number;
 
 function QueryWords({ query, title }: { query: string; title: string | null }) {
   const missing = new Set(missingQueryWords(query, title));
-  const words = query.split(/(\s+)/);
+  // Odd indexes are word runs, even ones the punctuation/spacing between them.
+  const parts = query.split(/([\p{L}\p{N}]+)/u);
   return (
     <span>
-      {words.map((w, i) =>
+      {parts.map((w, i) =>
         missing.has(w.toLowerCase()) ? (
           <span key={i} className="text-accent-300 underline decoration-accent-500 decoration-dotted underline-offset-4">
             {w}
