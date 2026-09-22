@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { PageRow } from "./reports";
 
@@ -96,4 +97,26 @@ export function selectPages(rows: PageRow[], minImpressions: number): PageRow[] 
   return rows
     .filter((r) => r.impressions > minImpressions && r.crawl && !r.crawl.error)
     .sort((a, b) => b.impressions - a.impressions);
+}
+
+export function describeAnthropicError(err: unknown): string {
+  if (err instanceof Anthropic.AuthenticationError) return "The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in Vercel.";
+  if (err instanceof Anthropic.RateLimitError) return "Anthropic rate limit hit. Try again in a minute.";
+  if (err instanceof Anthropic.APIError) {
+    // The API's own message is already plain English (e.g. "Your credit balance is too low…").
+    const apiMessage = (err.error as { error?: { message?: string } } | undefined)?.error?.message;
+    return `Anthropic API error${err.status ? ` ${err.status}` : ""}: ${apiMessage ?? err.message}`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+// Why no page qualified, in terms the dashboard can act on.
+export function noPagesReason(rows: PageRow[], minImpressions: number): string {
+  const busy = rows.filter((r) => r.impressions > minImpressions);
+  if (busy.length === 0) return `No pages have more than ${minImpressions} impressions in the last 90 days.`;
+  const crawled = busy.filter((r) => r.crawl);
+  if (crawled.length === 0) {
+    return `${busy.length} pages have more than ${minImpressions} impressions, but none have been crawled yet. Crawl the site first.`;
+  }
+  return `${busy.length} pages have more than ${minImpressions} impressions, but their last crawl failed. Crawl the site again.`;
 }

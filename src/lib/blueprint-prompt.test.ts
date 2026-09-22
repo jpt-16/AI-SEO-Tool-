@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { BlueprintOutput, buildUserPrompt, selectPages, SYSTEM_PROMPT, type PageSnapshot } from "./blueprint-prompt";
+import Anthropic from "@anthropic-ai/sdk";
+import {
+  BlueprintOutput,
+  buildUserPrompt,
+  describeAnthropicError,
+  noPagesReason,
+  selectPages,
+  SYSTEM_PROMPT,
+  type PageSnapshot,
+} from "./blueprint-prompt";
 import type { PageRow } from "./reports";
 
 const snapshot: PageSnapshot = {
@@ -82,6 +91,14 @@ describe("selectPages", () => {
     },
   });
 
+  it("explains why nothing qualified", () => {
+    expect(noPagesReason([row("a", 3, {})], 5)).toBe("No pages have more than 5 impressions in the last 90 days.");
+    expect(noPagesReason([row("a", 19, null), row("b", 6, null)], 0)).toBe(
+      "2 pages have more than 0 impressions, but none have been crawled yet. Crawl the site first.",
+    );
+    expect(noPagesReason([row("a", 19, { error: "HTTP 500" })], 0)).toMatch(/last crawl failed/);
+  });
+
   it("keeps crawled pages above the threshold, busiest first", () => {
     const picked = selectPages(
       [
@@ -94,5 +111,35 @@ describe("selectPages", () => {
       20,
     );
     expect(picked.map((p) => p.url)).toEqual(["c", "a"]);
+  });
+});
+
+describe("describeAnthropicError", () => {
+  it("surfaces the API's own message, e.g. an empty credit balance", () => {
+    const err = Anthropic.APIError.generate(
+      400,
+      {
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+        },
+      },
+      undefined,
+      new Headers(),
+    );
+    expect(describeAnthropicError(err)).toBe(
+      "Anthropic API error 400: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+    );
+  });
+
+  it("names a rejected key", () => {
+    const err = Anthropic.APIError.generate(
+      401,
+      { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } },
+      undefined,
+      new Headers(),
+    );
+    expect(describeAnthropicError(err)).toMatch(/API key was rejected/);
   });
 });

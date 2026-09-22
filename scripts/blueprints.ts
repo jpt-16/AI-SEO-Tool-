@@ -33,7 +33,7 @@ async function main() {
     for (const o of result.outcomes) {
       console.log(`  ${o.outcome.padEnd(9)} ${o.url}${o.error ? `  (${o.error})` : ""}`);
     }
-    if (result.pagesConsidered === 0) console.log("  No pages qualify. Try a lower --min-impressions.");
+    if (result.note) console.log(`  ${result.note}`);
     if (!result.ok) {
       failed = true;
       console.error(`  Failed: ${result.error}`);

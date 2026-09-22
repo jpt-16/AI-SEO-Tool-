@@ -5,11 +5,14 @@ import {
   BLUEPRINT_MODEL,
   BlueprintOutput,
   buildUserPrompt,
+  describeAnthropicError,
+  noPagesReason,
   selectPages,
   SYSTEM_PROMPT,
   type BlueprintResult,
   type PageSnapshot,
 } from "./blueprint-prompt";
+import { runSiteCrawl } from "./crawl-run";
 import { getOverview, getPageReport } from "./reports";
 import { db } from "./supabase";
 
@@ -39,6 +42,8 @@ export interface BlueprintRunResult {
   pagesAnalyzed: number;
   blueprintsCreated: number;
   outcomes: PageOutcome[];
+  // Why nothing was analyzed, when that's the case.
+  note?: string;
   error?: string;
 }
 
@@ -59,13 +64,6 @@ export async function analyzePage(
   if (response.stop_reason === "max_tokens") throw new Error("Claude's answer was cut off (max_tokens).");
   if (!response.parsed_output) throw new Error("Claude's answer didn't match the blueprint format.");
   return response.parsed_output.blueprint;
-}
-
-function describeError(err: unknown): string {
-  if (err instanceof Anthropic.AuthenticationError) return "The Anthropic API key was rejected. Check ANTHROPIC_API_KEY.";
-  if (err instanceof Anthropic.RateLimitError) return "Anthropic rate limit hit. Try again in a minute.";
-  if (err instanceof Anthropic.APIError) return `Anthropic API error ${err.status ?? ""}: ${err.message}`.trim();
-  return err instanceof Error ? err.message : String(err);
 }
 
 async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -96,9 +94,21 @@ export async function runBlueprints(
   const overview = await getOverview(siteId);
   if (!overview) return { ...result, error: "No Search Console data yet. Run a sync first." };
 
+  // Blueprints compare queries with the page's current title and meta, so a site needs a crawl first.
+  const { count: crawledCount, error: countError } = await db()
+    .from("crawl_pages")
+    .select("page_key", { count: "exact", head: true })
+    .eq("site_id", siteId);
+  if (countError) throw countError;
+  if (!crawledCount && !options.dryRun) {
+    const crawl = await runSiteCrawl(siteId, trigger);
+    if (!crawl.ok) return { ...result, error: `Crawling the site failed: ${crawl.error}` };
+  }
+
   const { rows } = await getPageReport(siteId, { window: overview.window, search: "", limit: 1000, offset: 0 });
   let pages = selectPages(rows, minImpressions);
   result.pagesConsidered = pages.length;
+  if (pages.length === 0) result.note = noPagesReason(rows, minImpressions);
 
   const { data: open, error: openError } = await db()
     .from("blueprints")
@@ -175,7 +185,7 @@ export async function runBlueprints(
         return { ...base, outcome: "blueprint" };
       } catch (err) {
         if (err instanceof Anthropic.AuthenticationError) throw err;
-        return { ...base, outcome: "error", error: describeError(err) };
+        return { ...base, outcome: "error", error: describeAnthropicError(err) };
       }
     });
 
@@ -186,7 +196,7 @@ export async function runBlueprints(
     result.ok = failed.length < outcomes.length || outcomes.length === 0;
     if (!result.ok) result.error = failed[0]?.error;
   } catch (err) {
-    result.error = describeError(err);
+    result.error = describeAnthropicError(err);
   }
 
   await db()

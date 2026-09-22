@@ -73,9 +73,7 @@ export async function generateBlueprints(_prev: ActionState | null, formData: Fo
   const result = await runBlueprints(String(formData.get("siteId") ?? ""), "manual", { minImpressions, maxPages: 10 });
   revalidatePath("/blueprints");
   if (!result.ok) return { ok: false, message: result.error ?? "Analysis failed." };
-  if (result.pagesConsidered === 0) {
-    return { ok: true, message: `No pages have more than ${minImpressions} impressions yet. Try a lower minimum.` };
-  }
+  if (result.pagesConsidered === 0) return { ok: true, message: result.note ?? "No pages qualify." };
   const skipped = result.outcomes.filter((o) => o.outcome === "skipped").length;
   const errors = result.outcomes.filter((o) => o.outcome === "error").length;
   const parts = [`Analyzed ${result.pagesAnalyzed} pages`, `${result.blueprintsCreated} new blueprints`];
