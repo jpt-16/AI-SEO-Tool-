@@ -1,27 +1,29 @@
 import { selectSite } from "@/app/(app)/actions";
 import type { Site } from "@/lib/sites";
 import { ChevronsIcon } from "./icons";
+import { MobileNav } from "./MobileNav";
 import { Monogram } from "./Monogram";
 import { NavLinks } from "./NavLinks";
 
-export function Sidebar({ sites, current, connected }: { sites: Site[]; current: Site | null; connected: boolean }) {
-  return (
-    <nav aria-label="Main" className="rule-right flex w-64 shrink-0 flex-col gap-9 px-6 py-8">
-      <div className="flex flex-col gap-3.5">
-        <Monogram height={36} />
-        <span className="eyebrow">SEO workbench</span>
-      </div>
+interface Props {
+  sites: Site[];
+  current: Site | null;
+  connected: boolean;
+}
 
+function NavBody({ sites, current, connected }: Props) {
+  return (
+    <>
       {current && (
         <div className="flex flex-col gap-2.5">
           <span className="eyebrow text-muted">Client</span>
           <details className="group relative">
             <summary className="flex min-h-13 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm [&::-webkit-details-marker]:hidden">
-              <span className="flex flex-col gap-0.5">
+              <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-medium">{current.name}</span>
-                <span className="text-xs text-muted">{current.domain}</span>
+                <span className="truncate text-xs text-muted">{current.domain}</span>
               </span>
-              <ChevronsIcon size={16} className="text-muted" />
+              <ChevronsIcon size={16} className="shrink-0 text-muted" />
             </summary>
             <form action={selectSite} className="panel absolute inset-x-0 top-full z-10 mt-2 flex flex-col p-1.5">
               {sites.map((site) => (
@@ -46,16 +48,33 @@ export function Sidebar({ sites, current, connected }: { sites: Site[]; current:
       <div className="mt-auto flex items-center gap-2.5 text-xs text-muted">
         {connected ? (
           <>
-            <span className="size-[7px] rounded-full bg-accent-500 shadow-[0_0_0_4px_rgb(145_132_217/0.16)]" />
+            <span className="size-[7px] shrink-0 rounded-full bg-accent-500 shadow-[0_0_0_4px_rgb(145_132_217/0.16)]" />
             Search Console connected · read-only
           </>
         ) : (
           <>
-            <span className="size-[7px] rounded-full bg-danger" />
+            <span className="size-[7px] shrink-0 rounded-full bg-danger" />
             Search Console not connected
           </>
         )}
       </div>
-    </nav>
+    </>
+  );
+}
+
+export function Sidebar(props: Props) {
+  return (
+    <>
+      <MobileNav clientName={props.current?.name ?? null}>
+        <NavBody {...props} />
+      </MobileNav>
+      <nav aria-label="Main" className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-9 overflow-y-auto px-6 py-8 rule-right lg:flex">
+        <div className="flex flex-col gap-3.5">
+          <Monogram height={36} id="jt-monogram-sidebar" />
+          <span className="eyebrow">SEO workbench</span>
+        </div>
+        <NavBody {...props} />
+      </nav>
+    </>
   );
 }

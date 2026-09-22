@@ -23,7 +23,7 @@ function CrawlBar({ siteId, crawl }: { siteId: string; crawl: CrawlRun | null })
     status = `Last crawled ${formatDateTime(crawl.finished_at ?? crawl.started_at)} · ${crawl.pages_crawled} pages${failed}`;
   }
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-6">
       <span className={`text-[13px] ${crawl?.status === "failed" ? "text-danger" : "text-muted"}`}>{status}</span>
       <ActionButton kind="crawl" siteId={siteId} label={crawl ? "Crawl again" : "Crawl site"} accent={!crawl} />
     </div>
@@ -36,8 +36,10 @@ function Delta({ text, good }: { text: string; good: boolean }) {
 
 function Kpi({ label, value, delta }: { label: string; value: string; delta: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2.5 border-line px-8 py-7.5 [&+&]:border-l">
-      <span className="text-[44px] leading-none font-medium tracking-[-0.01em] text-accent-500 tabular-nums">{value}</span>
+    <div className="flex flex-col gap-2 bg-surface px-5 py-5 sm:gap-2.5 sm:px-8 sm:py-7.5">
+      <span className="text-[32px] leading-none font-medium tracking-[-0.01em] text-accent-500 tabular-nums sm:text-[44px]">
+        {value}
+      </span>
       <span className="text-[11px] tracking-[0.24em] text-muted uppercase">{label}</span>
       {delta}
     </div>
@@ -55,7 +57,7 @@ function KpiRow({ current, prior }: { current: Totals; prior: Totals | null }) {
   const ctrPts = prior ? (current.ctr - prior.ctr) * 100 : null;
   const places = prior ? prior.position - current.position : null;
   return (
-    <section aria-label="Totals" className="panel grid grid-cols-2 overflow-hidden xl:grid-cols-4">
+    <section aria-label="Totals" className="panel grid grid-cols-2 gap-px overflow-hidden bg-line xl:grid-cols-4">
       <Kpi label="Clicks" value={formatCompact(current.clicks)} delta={prior && pctDelta(current.clicks, prior.clicks)} />
       <Kpi
         label="Impressions"
@@ -130,13 +132,13 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
 
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-6">
-        <div className="flex flex-col gap-3.5">
+      <header className="flex flex-wrap items-end justify-between gap-4 sm:gap-6">
+        <div className="flex min-w-0 flex-col gap-3.5">
           <span className="eyebrow">Google Search Console</span>
-          <h1 className="text-[44px] leading-[1.06] font-medium tracking-[-0.01em]">Search performance</h1>
+          <h1 className="text-[32px] leading-[1.06] font-medium tracking-[-0.01em] sm:text-[44px]">Search performance</h1>
           <div className="flex flex-wrap items-center gap-3">
             {site.gsc_property ? (
-              <span className="tag text-soft">{site.gsc_property}</span>
+              <span className="tag break-all text-soft">{site.gsc_property}</span>
             ) : (
               <Link href="/connections" className="tag border-accent-500 text-accent-500 no-underline">
                 Pick a Search Console property
@@ -152,7 +154,7 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {lastSuccess?.finished_at && (
-            <span className="text-xs text-muted">Last synced {formatDateTime(lastSuccess.finished_at)}</span>
+            <span className="w-full text-xs text-muted sm:w-auto">Last synced {formatDateTime(lastSuccess.finished_at)}</span>
           )}
           {overview && (
             <a href={exportHref} className="btn">
@@ -173,7 +175,7 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
       )}
 
       {!overview || !report ? (
-        <section className="panel flex flex-col items-start gap-4 p-8">
+        <section className="panel flex flex-col items-start gap-4 p-5 sm:p-8">
           <h2 className="text-lg font-medium">No Search Console data yet</h2>
           <p className="max-w-xl text-sm leading-relaxed text-muted">
             {site.gsc_property
@@ -191,7 +193,7 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
           {overview.current && <KpiRow current={overview.current} prior={overview.prior} />}
 
           <section aria-label="Breakdown" className="panel flex flex-1 flex-col overflow-hidden">
-            <div className="rule-bottom flex flex-wrap items-center justify-between gap-4 px-6 py-4.5">
+            <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 rule-bottom sm:px-6 sm:py-4.5">
               <div className="flex gap-2" aria-label="Group by">
                 {(["queries", "pages"] as const).map((t) => (
                   <Link
@@ -204,7 +206,7 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
                   </Link>
                 ))}
               </div>
-              <form className="flex items-end gap-3.5" action="/performance">
+              <form className="flex w-full items-end gap-3.5 sm:w-auto" action="/performance">
                 {tab !== "queries" && <input type="hidden" name="tab" value={tab} />}
                 <label htmlFor="filter" className="eyebrow pb-3">
                   Filter
@@ -215,7 +217,7 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
                   type="search"
                   defaultValue={search}
                   placeholder={tab === "queries" ? "Query contains…" : "URL or title contains…"}
-                  className="min-h-10 w-64 border-0 border-b border-line-strong bg-transparent px-0.5 py-2 text-[15px] text-ink placeholder:text-muted/70 focus:border-accent-500 focus:outline-none"
+                  className="min-h-10 w-full min-w-0 flex-1 border-0 border-b sm:w-64 sm:flex-none border-line-strong bg-transparent px-0.5 py-2 text-[15px] text-ink placeholder:text-muted/70 focus:border-accent-500 focus:outline-none"
                 />
               </form>
             </div>
@@ -223,14 +225,14 @@ export default async function PerformancePage({ searchParams }: PageProps<"/perf
             {report.tab === "pages" && <CrawlBar siteId={site.id} crawl={crawl} />}
 
             {report.rows.length === 0 ? (
-              <p className="px-6 py-10 text-sm text-muted">No {tab} match “{search}”.</p>
+              <p className="px-4 py-10 text-sm text-muted sm:px-6">No {tab} match “{search}”.</p>
             ) : report.tab === "queries" ? (
               <QueryTable rows={report.rows} />
             ) : (
               <PageList rows={report.rows} />
             )}
 
-            <div className="mt-auto flex items-center justify-between border-t border-line px-6 py-4 text-[13px] text-muted">
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-4 text-[13px] text-muted sm:px-6">
               <span>
                 {total ? `Showing ${formatInt(firstRow)}–${formatInt(lastRow)} of ${formatInt(total)} ${tab}` : " "}
               </span>

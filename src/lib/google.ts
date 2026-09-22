@@ -34,10 +34,14 @@ export async function getConnection(): Promise<GoogleConnection | null> {
 export async function gscRequester(): Promise<GscRequester | null> {
   const connection = await getConnection();
   if (!connection) return null;
+  let refreshToken: string;
+  try {
+    refreshToken = decryptSecret(connection.refresh_token_encrypted, requireEnv("TOKEN_ENCRYPTION_KEY"));
+  } catch {
+    throw new Error("The saved Google connection can't be read (TOKEN_ENCRYPTION_KEY changed?). Reconnect Google.");
+  }
   const client = oauthClient();
-  client.setCredentials({
-    refresh_token: decryptSecret(connection.refresh_token_encrypted, requireEnv("TOKEN_ENCRYPTION_KEY")),
-  });
+  client.setCredentials({ refresh_token: refreshToken });
   return (opts) => client.request(opts);
 }
 

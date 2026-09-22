@@ -29,7 +29,33 @@ function Position({ value }: { value: number }) {
 
 export function QueryTable({ rows }: { rows: QueryRow[] }) {
   return (
-    <table className="w-full border-collapse text-sm">
+    <>
+      <ul className="xl:hidden">
+        {rows.map((row) => (
+          <li key={row.query} className="flex flex-col gap-2.5 border-t border-line px-4 py-4 first:border-t-0">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0 font-medium break-words">{row.query}</span>
+              <Position value={row.position} />
+            </div>
+            {row.topPage && <span className="text-[13px] break-all text-muted">{pathOf(row.topPage)}</span>}
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-soft tabular-nums">
+              <span>
+                <span className="font-medium text-ink">{formatInt(row.clicks)}</span> clicks
+              </span>
+              <span>{formatInt(row.impressions)} impr.</span>
+              <span>{formatPct(row.ctr)} CTR</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <QueryRowsTable rows={rows} />
+    </>
+  );
+}
+
+function QueryRowsTable({ rows }: { rows: QueryRow[] }) {
+  return (
+    <table className="hidden w-full border-collapse text-sm xl:table">
       <thead>
         <tr className="text-left text-[10.5px] tracking-[0.2em] text-muted uppercase">
           <th scope="col" className="px-6 py-3.5 font-medium">Query</th>
@@ -43,7 +69,7 @@ export function QueryTable({ rows }: { rows: QueryRow[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.query} className="border-t border-line">
-            <td className="px-6 py-3.5 font-medium break-all">{row.query}</td>
+            <td className="px-6 py-3.5 font-medium break-words">{row.query}</td>
             <td className="px-6 py-3.5 text-[13px] break-all text-muted" title={row.topPage ?? undefined}>
               {row.topPage && pathOf(row.topPage)}
             </td>
@@ -120,7 +146,7 @@ function PageItem({ row }: { row: PageRow }) {
   const c = row.crawl;
   const failed = c && (c.error || (c.statusCode !== null && c.statusCode >= 400));
   return (
-    <li className="grid grid-cols-1 gap-6 border-t border-line px-6 py-5.5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
+    <li className="grid grid-cols-1 gap-5 border-t border-line px-4 py-5 sm:gap-6 sm:px-6 sm:py-5.5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
       <div className="flex min-w-0 flex-col gap-3.5">
         <div className="flex flex-wrap items-center gap-2">
           <a href={row.url} target="_blank" rel="noreferrer" className="font-medium break-all text-ink no-underline hover:text-accent-400" title={row.url}>
@@ -134,7 +160,7 @@ function PageItem({ row }: { row: PageRow }) {
 
         {c && !failed && (
           <>
-            <dl className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-sm leading-relaxed">
+            <dl className="grid grid-cols-[48px_minmax(0,1fr)] gap-x-3 gap-y-2.5 text-sm leading-relaxed break-words sm:grid-cols-[64px_minmax(0,1fr)] sm:gap-x-4">
               <dt className="pt-0.5 text-[10.5px] tracking-[0.2em] text-muted uppercase">Title</dt>
               <dd>
                 <OnPageText text={c.title} max={TITLE_MAX} missing="No title tag" />
@@ -148,7 +174,7 @@ function PageItem({ row }: { row: PageRow }) {
                 <OnPageText text={c.h1.join(" · ") || null} missing="No H1" />
               </dd>
             </dl>
-            <p className="text-xs text-muted">
+            <p className="text-xs leading-relaxed text-muted">
               {formatInt(c.wordCount ?? 0)} words · {formatInt(c.internalLinkCount ?? 0)} internal links · Schema:{" "}
               {c.schemaTypes.length ? c.schemaTypes.join(", ") : "none"}
             </p>
@@ -157,7 +183,7 @@ function PageItem({ row }: { row: PageRow }) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-2 sm:gap-3">
           <Stat label="Clicks" value={formatInt(row.clicks)} />
           <Stat label="Impr." value={formatInt(row.impressions)} />
           <Stat label="CTR" value={row.ctr === null ? "—" : formatPct(row.ctr)} />
@@ -187,7 +213,7 @@ function PageItem({ row }: { row: PageRow }) {
 export function PageList({ rows }: { rows: PageRow[] }) {
   return (
     <>
-      <p className="px-6 pt-3.5 pb-3 text-xs text-muted">
+      <p className="px-4 pt-3.5 pb-3 text-xs text-muted sm:px-6">
         Top queries per page. <span className="text-accent-300 underline decoration-dotted underline-offset-4">Underlined words</span>{" "}
         don’t appear in that page’s title tag.
       </p>
