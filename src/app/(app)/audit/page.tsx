@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/ActionButton";
+import { CopyAuditButton } from "@/components/CopyAuditButton";
 import { pathOf } from "@/components/ReportTables";
 import { groupIssues, ISSUE_TYPES, type Severity } from "@/lib/audit";
 import { getAudit, type AuditEntry } from "@/lib/audit-data";
@@ -110,18 +111,28 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
         <Tile label="Marked fixed" value={fixed.length} />
       </div>
 
-      <nav aria-label="Audit view" className="flex flex-wrap gap-2">
-        {(["open", "fixed"] as const).map((v) => (
-          <Link
-            key={v}
-            href={v === "open" ? "/audit" : "/audit?view=fixed"}
-            aria-current={v === view ? "page" : undefined}
-            className={`btn min-h-10 px-4 ${v === view ? "btn-accent" : "border-line text-muted"}`}
-          >
-            {v === "open" ? `To fix · ${open.length}` : `Marked fixed · ${fixed.length}`}
-          </Link>
-        ))}
-      </nav>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <nav aria-label="Audit view" className="flex flex-wrap gap-2">
+          {(["open", "fixed"] as const).map((v) => (
+            <Link
+              key={v}
+              href={v === "open" ? "/audit" : "/audit?view=fixed"}
+              aria-current={v === view ? "page" : undefined}
+              className={`btn min-h-10 px-4 ${v === view ? "btn-accent" : "border-line text-muted"}`}
+            >
+              {v === "open" ? `To fix · ${open.length}` : `Marked fixed · ${fixed.length}`}
+            </Link>
+          ))}
+        </nav>
+        {crawl && open.length > 0 && (
+          <div className="flex flex-wrap gap-2" aria-label="Export">
+            <a href="/api/audit/export" className="btn min-h-10 px-4 text-[11.5px]" download>
+              Download for Claude Code
+            </a>
+            <CopyAuditButton />
+          </div>
+        )}
+      </div>
 
       {!crawl ? (
         <p className="panel p-5 text-sm text-muted sm:p-7">Crawl the site to run the audit.</p>

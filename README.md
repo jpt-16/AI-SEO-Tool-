@@ -198,6 +198,11 @@ type, most serious first, then by the search impressions of the pages affected:
 - **Low:** meta descriptions over 155 characters or duplicated, multiple H1s, under 300 words, no
   schema, not in the sitemap, image problems, failed captures, llms.txt problems.
 
+**Download for Claude Code** (`/api/audit/export`, a `.md` file) and **Copy for Claude Code** turn the
+open issues into a brief for whoever edits the site: instructions first, then issues grouped by page
+(busiest and most serious first), each with what's wrong now and exactly what to change
+(`src/lib/audit-export.ts`). Paste it into Claude Code in the client site's repo.
+
 Legal and contact pages skip the word-count, schema and call-to-action checks. **Mark fixed** hides an
 issue (stored in `audit_fixes`) until a newer crawl still finds it; then it comes back, flagged as
 still present. Issues are recomputed on every view, so nothing goes stale.
