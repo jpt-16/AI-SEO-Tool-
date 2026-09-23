@@ -3,6 +3,7 @@
 //
 //   npm run crawl                          # every site in the sites table
 //   npm run crawl -- cloverdownsdetailing.com
+//   VISUAL_CAPTURE=off npm run crawl         # skip the headless-browser step
 import { runSiteCrawl } from "../src/lib/crawl-run";
 import { listSites } from "../src/lib/sites";
 
@@ -22,6 +23,8 @@ async function main() {
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     if (result.ok) {
       console.log(`  ${result.pagesCrawled} pages saved, ${result.pagesFailed} failed (${seconds}s)`);
+      if (result.visualError) console.log(`  Visual: ${result.visualError}`);
+      else if (result.visualPages !== undefined) console.log(`  Visual: ${result.visualPages} pages scored, ${result.visualFailed} failed`);
     } else {
       failed = true;
       console.error(`  Failed: ${result.error}`);

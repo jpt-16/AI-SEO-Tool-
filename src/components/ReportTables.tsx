@@ -1,6 +1,7 @@
 import { formatInt, formatPct, formatPosition } from "@/lib/format";
 import { missingQueryWords } from "@/lib/match";
 import type { PageRow, QueryRow } from "@/lib/reports";
+import { PageInsights, ScoreChips } from "./PageInsights";
 
 export function pathOf(url: string) {
   try {
@@ -178,6 +179,8 @@ function PageItem({ row }: { row: PageRow }) {
               {formatInt(c.wordCount ?? 0)} words · {formatInt(c.internalLinkCount ?? 0)} internal links · Schema:{" "}
               {c.schemaTypes.length ? c.schemaTypes.join(", ") : "none"}
             </p>
+            <ScoreChips crawl={c} />
+            <PageInsights pageKey={row.pageKey} crawl={c} />
           </>
         )}
       </div>

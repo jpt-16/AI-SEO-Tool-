@@ -92,6 +92,15 @@ describe("selectPages", () => {
       statusCode: 200,
       error: null,
       crawledAt: "2026-09-22T00:00:00Z",
+      visual: {
+        score: null,
+        checks: [],
+        capture: { networkIdle: null, status: null, failedRequests: null },
+        error: null,
+        capturedAt: null,
+        hasScreenshot: false,
+      },
+      answers: { score: null, check: null },
       ...crawl,
     },
   });

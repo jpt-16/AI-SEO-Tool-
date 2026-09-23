@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { runSiteCrawl } from "@/lib/crawl-run";
 import { listSites } from "@/lib/sites";
 
-export const maxDuration = 60;
+// A crawl includes headless-browser capture of every page.
+export const maxDuration = 300;
 
 // POST /api/crawl            -> every site
 // POST /api/crawl?siteId=... -> one site

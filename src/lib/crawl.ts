@@ -1,5 +1,6 @@
 import { load, type CheerioAPI } from "cheerio";
 import type { AnyNode } from "domhandler";
+import { checkAnswers, type AnswerCheck } from "./aeo";
 
 export const CRAWLER_USER_AGENT = "JTBuildsSEOBot/1.0 (+https://jtbuildsco.com)";
 
@@ -31,7 +32,7 @@ const collapse = (text: string) =>
     .trim();
 
 // Joins text nodes with spaces so <h1>Beverly<span>Your car</span></h1> reads "Beverly Your car".
-function visibleText(nodes: AnyNode[]): string {
+export function visibleText(nodes: AnyNode[]): string {
   const parts: string[] = [];
   const walk = (node: AnyNode) => {
     if (node.type === "text") parts.push(node.data);
@@ -62,6 +63,7 @@ export interface ExtractedPage {
   internalLinks: string[];
   jsonLd: unknown[];
   schemaTypes: string[];
+  answers: AnswerCheck;
 }
 
 export function extractPage(html: string, pageUrl: string): ExtractedPage {
@@ -118,6 +120,7 @@ export function extractPage(html: string, pageUrl: string): ExtractedPage {
     internalLinks: [...internalLinks],
     jsonLd,
     schemaTypes: [...types].sort(),
+    answers: checkAnswers($, jsonLd),
   };
 }
 

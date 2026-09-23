@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/ActionButton";
+import { SiteAeoSummary } from "@/components/PageInsights";
 import { PageList, QueryTable } from "@/components/ReportTables";
 import { getLatestCrawl, type CrawlRun } from "@/lib/crawl-run";
 import { formatCompact, formatDate, formatDateTime, formatInt, formatPct, formatPosition } from "@/lib/format";
@@ -9,7 +10,8 @@ import { percentChange, type Totals } from "@/lib/metrics";
 import { getOverview, getPageReport, getQueryReport, getRecentRuns, type ReportTab } from "@/lib/reports";
 import { getCurrentSite } from "@/lib/sites";
 
-export const maxDuration = 60;
+// A crawl includes headless-browser capture of every page.
+export const maxDuration = 300;
 
 const PAGE_SIZE = 25;
 
@@ -22,10 +24,22 @@ function CrawlBar({ siteId, crawl }: { siteId: string; crawl: CrawlRun | null })
     const failed = crawl.pages_failed ? ` · ${crawl.pages_failed} failed` : "";
     status = `Last crawled ${formatDateTime(crawl.finished_at ?? crawl.started_at)} · ${crawl.pages_crawled} pages${failed}`;
   }
+  const done = crawl?.status === "succeeded";
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-6">
-      <span className={`text-[13px] ${crawl?.status === "failed" ? "text-danger" : "text-muted"}`}>{status}</span>
-      <ActionButton kind="crawl" siteId={siteId} label={crawl ? "Crawl again" : "Crawl site"} accent={!crawl} />
+    <div className="flex flex-col gap-3.5 border-b border-line px-4 py-3.5 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <span className={`text-[13px] ${crawl?.status === "failed" ? "text-danger" : "text-muted"}`}>{status}</span>
+          {done && crawl.visual_error && <span className="text-[13px] text-danger">{crawl.visual_error}</span>}
+          {done && !crawl.visual_error && crawl.visual_pages !== null && (
+            <span className="text-[13px] text-muted">
+              Visual scores for {crawl.visual_pages} pages{crawl.visual_failed ? ` · ${crawl.visual_failed} couldn’t be captured` : ""}
+            </span>
+          )}
+        </div>
+        <ActionButton kind="crawl" siteId={siteId} label={crawl ? "Crawl again" : "Crawl site"} accent={!crawl} />
+      </div>
+      {done && crawl.aeo && <SiteAeoSummary aeo={crawl.aeo} />}
     </div>
   );
 }

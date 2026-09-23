@@ -1,4 +1,6 @@
 import "server-only";
+import type { AnswerCheck } from "./aeo";
+import type { VisualCheck } from "./visual-core";
 import { priorWindow, windowEndingOn, type DateWindow } from "./dates";
 import { summarize, type Totals } from "./metrics";
 import { db } from "./supabase";
@@ -112,6 +114,17 @@ export interface PageRow {
     statusCode: number | null;
     error: string | null;
     crawledAt: string;
+    visual: {
+      score: number | null;
+      checks: VisualCheck[];
+      // How the capture went: a bad status, failed requests or no network idle can mean
+      // the screenshot shows a half-loaded page.
+      capture: { networkIdle: boolean | null; status: number | null; failedRequests: number | null };
+      error: string | null;
+      capturedAt: string | null;
+      hasScreenshot: boolean;
+    };
+    answers: { score: number | null; check: AnswerCheck | null };
   } | null;
 }
 
@@ -144,6 +157,22 @@ export async function getPageReport(siteId: string, paging: Paging): Promise<{ r
             statusCode: (r.status_code as number | null) ?? null,
             error: (r.crawl_error as string | null) ?? null,
             crawledAt: String(r.crawled_at),
+            visual: {
+              score: (r.visual_score as number | null) ?? null,
+              checks: (r.visual_checks as VisualCheck[] | null) ?? [],
+              capture: {
+                networkIdle: (r.visual_capture as { networkIdle?: boolean } | null)?.networkIdle ?? null,
+                status: (r.visual_capture as { status?: number } | null)?.status ?? null,
+                failedRequests: (r.visual_capture as { failedRequests?: number } | null)?.failedRequests ?? null,
+              },
+              error: (r.visual_error as string | null) ?? null,
+              capturedAt: (r.visual_captured_at as string | null) ?? null,
+              hasScreenshot: Boolean(r.has_screenshot),
+            },
+            answers: {
+              score: (r.answer_score as number | null) ?? null,
+              check: (r.answer_check as AnswerCheck | null) ?? null,
+            },
           }
         : null,
     })),

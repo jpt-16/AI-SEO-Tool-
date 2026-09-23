@@ -119,6 +119,59 @@ Or click **Crawl site** on the Pages tab. The Pages tab shows every page's Searc
 queries next to its current title, meta description, H1 and content facts. Query words that don't appear
 in the page's title are underlined.
 
+## Visual scoring
+
+Every crawl also opens each page in headless Chromium (`src/lib/visual.ts`) and scores its design
+and usability on a phone screen, 0–100 (`src/lib/visual-core.ts`):
+
+| Check | Points |
+| --- | --- |
+| Fits a phone screen: responsive viewport tag, no sideways scrolling | 20 |
+| Readable text size: share of text at 12px or larger | 15 |
+| Text contrast: share of text meeting WCAG AA (4.5:1, or 3:1 for large text) | 20 |
+| Tap targets: 24×24px or spaced per WCAG 2.5.8 | 15 |
+| First screen: an H1 and a call/text/quote/contact button visible without scrolling | 20 |
+| Images: none broken, alt text present | 10 |
+
+Captures are built to repeat exactly: one fixed 390×844 viewport, scale, user agent, locale and
+timezone; wait for network idle (not just DOMContentLoaded); inject
+`* { animation: none !important; transition: none !important; }` before the first paint and again after
+load; scroll once through the page so lazy images and scroll-reveal content load, then wait for the
+network to go quiet again; then a fixed 500ms settle before measuring and taking the first-screen
+screenshot. Check it any time:
+
+```bash
+npm run visual-check -- https://cloverdownsdetailing.com/ https://jtbuildsco.com/pricing --runs=3
+```
+
+It captures each URL several times and compares the scores, every raw measurement and the screenshot
+bytes. Tested on 30 pages across both sites over three crawls: 89 of 90 captures matched exactly, and the
+one outlier was a page that came back without its header in one crawl, not a timing difference. Each
+capture now records the page's HTTP status and failed requests, and the dashboard warns when either is
+off. JavaScript-timed carousels are the one thing the freeze can't stop; they can change which slide
+is captured.
+
+Chromium comes from `@sparticuz/chromium` on Vercel. Locally, set `CHROMIUM_PATH` or run
+`npx playwright-core install chromium` once. `VISUAL_CAPTURE=off` skips the step. A failed capture never
+fails the crawl.
+
+## AEO / GEO checks
+
+Static checks for AI answer engines (`src/lib/aeo.ts`); no model calls:
+
+- **AI crawlers:** robots.txt is parsed per user-agent group for GPTBot, ClaudeBot, Google-Extended,
+  PerplexityBot and anthropic-ai. Each is marked allowed, blocked (the home page is disallowed) or
+  partly blocked (some crawled pages are disallowed), using its own group if it has one, else `*`.
+- **llms.txt:** checks `/llms.txt` exists as text (not an HTML soft 404) with a `# Name` title, a `> `
+  summary and links, and whether `/llms-full.txt` exists too.
+- **Answer extractability, per page:** finds questions in `<details>`/`<summary>`, `<dt>`/`<dd>`,
+  question headings, bold-question paragraphs and FAQPage schema, plus the page's opening paragraph.
+  Each answer scores up to 100: a first block of 10–60 words (40), a first sentence of 25 words or
+  fewer (30), and a first sentence that doesn't start with a pronoun like "It" or "This" (30).
+
+Site results show on the Pages tab under the crawl bar. Each page gets Visual and Answers scores, with
+the screenshot, each check and each question under "Visual and answer details".
+
 ## Blueprints (AI review)
 
 `src/lib/blueprints.ts` asks Claude (`claude-sonnet-4-6`, via the Messages API with adaptive thinking)

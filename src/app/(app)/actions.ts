@@ -66,7 +66,12 @@ export async function runCrawl(_prev: ActionState | null, formData: FormData): P
   revalidatePath("/", "layout");
   if (!result.ok) return { ok: false, message: result.error ?? "Crawl failed." };
   const failed = result.pagesFailed ? `, ${result.pagesFailed} failed` : "";
-  return { ok: true, message: `Crawled ${result.pagesCrawled} pages${failed}.` };
+  const visual = result.visualError
+    ? ` ${result.visualError}`
+    : result.visualPages !== undefined
+      ? ` Visual scores for ${result.visualPages} pages.`
+      : "";
+  return { ok: true, message: `Crawled ${result.pagesCrawled} pages${failed}.${visual}` };
 }
 
 export async function generateBlueprints(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
