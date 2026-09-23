@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // Routes that can run a crawl, which launches headless Chromium for visual scoring.
-const CRAWL_ROUTES = ["/api/crawl", "/api/cron/crawl", "/performance", "/blueprints"];
+const CRAWL_ROUTES = ["/api/crawl", "/api/cron/crawl", "/performance", "/blueprints", "/audit"];
 
 const nextConfig: NextConfig = {
   // Loaded from node_modules at runtime rather than bundled.

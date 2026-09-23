@@ -176,6 +176,23 @@ Static checks for AI answer engines (`src/lib/aeo.ts`); no model calls:
 Site results show on the Pages tab under the crawl bar. Each page gets Visual and Answers scores, with
 the screenshot, each check and each question under "Visual and answer details".
 
+## Site audit
+
+The **Site audit** page (`src/lib/audit.ts`) turns the latest crawl into one list of problems, grouped by
+type, most serious first, then by the search impressions of the pages affected:
+
+- **High:** pages returning errors, AI crawlers blocked in robots.txt, missing titles, pages that
+  don't fit a phone screen.
+- **Medium:** pages Search Console shows but the crawler couldn't find, titles over 60 characters or
+  duplicated, missing meta descriptions or H1s, low contrast, small text, crowded tap targets, no
+  headline or call to action on the first screen, answers scoring under 70.
+- **Low:** meta descriptions over 155 characters or duplicated, multiple H1s, under 300 words, no
+  schema, not in the sitemap, image problems, failed captures, llms.txt problems.
+
+Legal and contact pages skip the word-count, schema and call-to-action checks. **Mark fixed** hides an
+issue (stored in `audit_fixes`) until a newer crawl still finds it; then it comes back, flagged as
+still present. Issues are recomputed on every view, so nothing goes stale.
+
 ## Blueprints (AI review)
 
 `src/lib/blueprints.ts` asks Claude (`claude-sonnet-4-6`, via the Messages API with adaptive thinking)

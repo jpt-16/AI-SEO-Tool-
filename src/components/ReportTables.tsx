@@ -1,3 +1,4 @@
+import { META_MAX, TITLE_MAX } from "@/lib/audit";
 import { formatInt, formatPct, formatPosition } from "@/lib/format";
 import { missingQueryWords } from "@/lib/match";
 import type { PageRow, QueryRow } from "@/lib/reports";
@@ -87,9 +88,6 @@ function QueryRowsTable({ rows }: { rows: QueryRow[] }) {
   );
 }
 
-// Common rule-of-thumb limits before Google truncates in results.
-const TITLE_MAX = 60;
-const META_MAX = 160;
 
 function Flag({ children, tone = "warn" }: { children: React.ReactNode; tone?: "warn" | "info" }) {
   return (

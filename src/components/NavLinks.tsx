@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/performance", label: "Search performance", Icon: ChartIcon },
   { href: "/blueprints", label: "Blueprints", Icon: ClipboardIcon },
   { href: "/results", label: "Results", Icon: CompareIcon },
+  { href: "/audit", label: "Site audit", Icon: SearchIcon },
   { href: "/connections", label: "Connections", Icon: LinkIcon },
 ];
 
@@ -31,11 +32,6 @@ export function NavLinks() {
           </Link>
         );
       })}
-      <span className="flex min-h-11 items-center gap-3 px-3 text-sm text-muted" aria-disabled="true">
-        <SearchIcon />
-        Site audit
-        <span className="ml-auto text-[10.5px] tracking-[0.16em]">SOON</span>
-      </span>
     </div>
   );
 }

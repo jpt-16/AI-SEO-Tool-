@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { ISSUE_TYPES } from "@/lib/audit";
 import { markBlueprintDone } from "@/lib/attribution";
 import { DEFAULT_MIN_IMPRESSIONS, runBlueprints } from "@/lib/blueprints";
 import { runSiteCrawl } from "@/lib/crawl-run";
@@ -133,4 +134,18 @@ export async function disconnectGoogle() {
     if (error) throw error;
   }
   redirect("/connect");
+}
+
+export async function setAuditIssue(formData: FormData) {
+  const siteId = String(formData.get("siteId") ?? "");
+  const pageKey = String(formData.get("pageKey") ?? "");
+  const issue = String(formData.get("issue") ?? "");
+  const fixed = formData.get("fixed") === "true";
+  if (!siteId || !(issue in ISSUE_TYPES)) throw new Error("Invalid audit update.");
+  const match = db().from("audit_fixes");
+  const { error } = fixed
+    ? await match.upsert({ site_id: siteId, page_key: pageKey, issue, fixed_at: new Date().toISOString() }, { onConflict: "site_id,page_key,issue" })
+    : await match.delete().eq("site_id", siteId).eq("page_key", pageKey).eq("issue", issue);
+  if (error) throw error;
+  revalidatePath("/audit");
 }
