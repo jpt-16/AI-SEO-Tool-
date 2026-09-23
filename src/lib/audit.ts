@@ -189,12 +189,15 @@ export interface AuditFix {
   page_key: string;
   issue: string;
   fixed_at: string;
+  // "ignored" = marked not an issue: stays hidden whatever later crawls find.
+  kind: "fixed" | "ignored";
 }
 
-export type FixState = "open" | "fixed" | "returned";
+export type FixState = "open" | "fixed" | "returned" | "ignored";
 
 // A mark counts until newer data still shows the issue; then it's "returned" (shown as open).
 export function fixState(issue: AuditIssue, fix: AuditFix | undefined): FixState {
+  if (fix?.kind === "ignored") return "ignored";
   if (!fix) return "open";
   if (issue.detectedAt && new Date(issue.detectedAt) > new Date(fix.fixed_at)) return "returned";
   return "fixed";

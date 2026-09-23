@@ -173,7 +173,11 @@ describe("fixState", () => {
   const issue: AuditIssue = { type: "meta_long", pageKey: "p", url: null, detail: "", impressions: 0, detectedAt: "2026-09-23T13:00:00Z" };
   it("stays fixed until a newer crawl still finds the issue", () => {
     expect(fixState(issue, undefined)).toBe("open");
-    expect(fixState(issue, { page_key: "p", issue: "meta_long", fixed_at: "2026-09-23T14:00:00Z" })).toBe("fixed");
-    expect(fixState({ ...issue, detectedAt: "2026-09-30T10:00:00Z" }, { page_key: "p", issue: "meta_long", fixed_at: "2026-09-23T14:00:00Z" })).toBe("returned");
+    expect(fixState(issue, { page_key: "p", issue: "meta_long", fixed_at: "2026-09-23T14:00:00Z", kind: "fixed" })).toBe("fixed");
+    expect(fixState({ ...issue, detectedAt: "2026-09-30T10:00:00Z" }, { page_key: "p", issue: "meta_long", fixed_at: "2026-09-23T14:00:00Z", kind: "fixed" })).toBe("returned");
+  });
+
+  it("keeps 'not an issue' hidden whatever later crawls find", () => {
+    expect(fixState({ ...issue, detectedAt: "2026-09-30T10:00:00Z" }, { page_key: "p", issue: "meta_long", fixed_at: "2026-09-23T14:00:00Z", kind: "ignored" })).toBe("ignored");
   });
 });

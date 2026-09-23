@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const { entries, crawl } = await getAudit(site.id);
   const markdown = auditBrief({
     site,
-    issues: entries.filter((e) => e.state !== "fixed"),
+    issues: entries.filter((e) => e.state === "open" || e.state === "returned"),
     crawledAt: crawl?.finished_at ?? crawl?.started_at ?? null,
     generatedAt: new Date(),
   });

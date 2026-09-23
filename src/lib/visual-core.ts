@@ -111,7 +111,9 @@ export function scoreVisual(m: VisualMetrics): VisualScore {
       points: (m.aboveFold.h1 ? 10 : 0) + (m.aboveFold.cta ? 10 : 0),
       detail: [
         m.aboveFold.h1 ? "Headline visible without scrolling." : "No H1 visible without scrolling.",
-        m.aboveFold.cta ? `Call to action visible ("${m.aboveFold.ctaText}").` : "No call, text, quote or contact button visible without scrolling.",
+        m.aboveFold.cta
+          ? `Call to action visible ("${m.aboveFold.ctaText}").`
+          : "Couldn't find a call-to-action button or link (call, book, quote, shop, contact…) on the first screen. Check the screenshot.",
       ].join(" "),
     },
     {

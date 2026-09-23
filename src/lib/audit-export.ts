@@ -16,7 +16,7 @@ export const FIX: Record<IssueType, string> = {
   visual_contrast: "Raise the contrast of the low-contrast text to at least 4.5:1 against its background (3:1 for large text), by darkening the text or changing the background.",
   visual_legibility: "Raise body and label text to at least 12px on phones (16px for body copy is better).",
   visual_tapTargets: "Make small buttons and links at least 24×24px, or add spacing so they're not crowded together.",
-  visual_aboveFold: "On a 390×844 phone screen, the H1 and a main call-to-action button (call, text, quote, book or contact) should both be visible without scrolling.",
+  visual_aboveFold: "Check the first screen on a 390×844 phone: the H1 and a main call-to-action (e.g. call, book, quote, shop, contact) should both be visible without scrolling. The check is automatic, so verify first: if a clear call to action is already visible, change nothing and say which one it is.",
   answers_weak: "After each question heading or FAQ item, start with a direct answer of 25 words or fewer that makes sense on its own (don't start with 'It' or 'This'). Keep that first paragraph under 60 words, and put detail after it.",
   meta_long: `Shorten the meta description to ${META_MAX} characters or fewer so it isn't cut off.`,
   meta_duplicate: "Write a meta description specific to this page, so it doesn't match another page.",

@@ -205,7 +205,9 @@ open issues into a brief for whoever edits the site: instructions first, then is
 
 Legal and contact pages skip the word-count, schema and call-to-action checks. **Mark fixed** hides an
 issue (stored in `audit_fixes`) until a newer crawl still finds it; then it comes back, flagged as
-still present. Issues are recomputed on every view, so nothing goes stale.
+still present. **Not an issue** is for judgement calls the checks can get wrong (a call to action the
+detector didn't recognise, a page meant to be short): it stays hidden across crawls until reopened.
+Both show under **Resolved**. Issues are recomputed on every view, so nothing goes stale.
 
 ## Blueprints (AI review)
 

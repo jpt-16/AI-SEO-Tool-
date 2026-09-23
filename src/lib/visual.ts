@@ -198,11 +198,17 @@ export const VISUAL_METRICS_SCRIPT = `(() => {
 
   const inFirstScreen = (el) => { const r = el.getBoundingClientRect(); return shown(el) && opacityOf(el) >= 0.1 && r.top < vh && r.bottom > 0 && r.left < vw && r.right > 0; };
   const h1 = Array.from(document.querySelectorAll("h1")).find(inFirstScreen) || null;
-  const ctaWords = /\\b(call|text|quote|book|contact|get started|schedule|estimate|free|hire|start)\\b/i;
-  const cta = Array.from(document.querySelectorAll("a[href], button")).find((el) => {
+  // A call to action: wording that asks the visitor to act, or a link to a page where they
+  // act (contact, booking, quote, shop, cart). Covers service businesses and shops alike.
+  const ctaWords = /\\b(call|phone|text|message|email|quote|estimate|book|booking|appointment|schedule|reserve|contact|enquire|inquire|get started|start|hire|request|apply|free|shop|buy|order|add to cart|checkout|browse|in stock|notify|subscribe|sign up|join|donate)\\b/i;
+  const ctaHref = /^(tel|sms|mailto):|(^|\\/)(contact|book|booking|quote|estimate|schedule|appointment|shop|store|products?|cart|checkout|order|reserve)([\\/.?#]|$)/i;
+  const cta = Array.from(document.querySelectorAll("a[href], button, [role=button], input[type=submit]")).find((el) => {
     if (!inFirstScreen(el)) return false;
+    const label = clean(el.textContent || el.getAttribute("aria-label") || el.getAttribute("value") || "");
+    // Menu toggles and the logo link aren't calls to action.
+    if (/^(menu|open menu|close|close menu|toggle navigation)$/i.test(label)) return false;
     const href = el.getAttribute("href") || "";
-    return /^(tel|sms|mailto):/i.test(href) || ctaWords.test(clean(el.textContent) + " " + (el.getAttribute("aria-label") || ""));
+    return ctaHref.test(href) || ctaWords.test(label);
   }) || null;
 
   const images = { total: 0, broken: 0, missingAlt: 0, samples: [] };

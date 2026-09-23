@@ -140,12 +140,18 @@ export async function setAuditIssue(formData: FormData) {
   const siteId = String(formData.get("siteId") ?? "");
   const pageKey = String(formData.get("pageKey") ?? "");
   const issue = String(formData.get("issue") ?? "");
-  const fixed = formData.get("fixed") === "true";
-  if (!siteId || !(issue in ISSUE_TYPES)) throw new Error("Invalid audit update.");
+  // "fixed": hidden until a newer crawl still finds it. "ignored": not an issue, stays hidden.
+  // "open": reopen.
+  const mode = String(formData.get("mode") ?? "");
+  if (!siteId || !(issue in ISSUE_TYPES) || !["fixed", "ignored", "open"].includes(mode)) throw new Error("Invalid audit update.");
   const match = db().from("audit_fixes");
-  const { error } = fixed
-    ? await match.upsert({ site_id: siteId, page_key: pageKey, issue, fixed_at: new Date().toISOString() }, { onConflict: "site_id,page_key,issue" })
-    : await match.delete().eq("site_id", siteId).eq("page_key", pageKey).eq("issue", issue);
+  const { error } =
+    mode === "open"
+      ? await match.delete().eq("site_id", siteId).eq("page_key", pageKey).eq("issue", issue)
+      : await match.upsert(
+          { site_id: siteId, page_key: pageKey, issue, kind: mode, fixed_at: new Date().toISOString() },
+          { onConflict: "site_id,page_key,issue" },
+        );
   if (error) throw error;
   revalidatePath("/audit");
 }

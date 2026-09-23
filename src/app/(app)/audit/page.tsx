@@ -19,21 +19,21 @@ const SEVERITY: Record<Severity, { label: string; className: string }> = {
   low: { label: "Low", className: "border-line-strong text-muted" },
 };
 
-function FixButton({ siteId, entry, fixed }: { siteId: string; entry: AuditEntry; fixed: boolean }) {
+function IssueButton({ siteId, entry, mode, label }: { siteId: string; entry: AuditEntry; mode: "fixed" | "ignored" | "open"; label: string }) {
   return (
-    <form action={setAuditIssue} className="shrink-0">
+    <form action={setAuditIssue} className="flex-1 sm:flex-none">
       <input type="hidden" name="siteId" value={siteId} />
       <input type="hidden" name="pageKey" value={entry.pageKey} />
       <input type="hidden" name="issue" value={entry.type} />
-      <input type="hidden" name="fixed" value={String(fixed)} />
+      <input type="hidden" name="mode" value={mode} />
       <button type="submit" className="btn min-h-10 w-full px-3.5 text-[11.5px] sm:w-auto">
-        {fixed ? "Mark fixed" : "Reopen"}
+        {label}
       </button>
     </form>
   );
 }
 
-function IssueRow({ siteId, entry, view }: { siteId: string; entry: AuditEntry; view: "open" | "fixed" }) {
+function IssueRow({ siteId, entry, view }: { siteId: string; entry: AuditEntry; view: "open" | "resolved" }) {
   return (
     <li className="flex flex-col gap-2.5 border-t border-line py-3.5 first:border-t-0 sm:flex-row sm:items-start sm:gap-5">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -51,11 +51,23 @@ function IssueRow({ siteId, entry, view }: { siteId: string; entry: AuditEntry; 
         {entry.state === "returned" && entry.fixedAt && (
           <p className="text-xs text-danger">Marked fixed {formatDateTime(entry.fixedAt)}, but the latest crawl still finds it.</p>
         )}
-        {view === "fixed" && entry.fixedAt && (
+        {entry.state === "fixed" && entry.fixedAt && (
           <p className="text-xs text-muted">Marked fixed {formatDateTime(entry.fixedAt)}. It comes back if the next crawl still finds it.</p>
         )}
+        {entry.state === "ignored" && entry.fixedAt && (
+          <p className="text-xs text-muted">Marked not an issue {formatDateTime(entry.fixedAt)}. Stays hidden until you reopen it.</p>
+        )}
       </div>
-      <FixButton siteId={siteId} entry={entry} fixed={view === "open"} />
+      <div className="flex shrink-0 gap-2">
+        {view === "open" ? (
+          <>
+            <IssueButton siteId={siteId} entry={entry} mode="fixed" label="Mark fixed" />
+            <IssueButton siteId={siteId} entry={entry} mode="ignored" label="Not an issue" />
+          </>
+        ) : (
+          <IssueButton siteId={siteId} entry={entry} mode="open" label="Reopen" />
+        )}
+      </div>
     </li>
   );
 }
@@ -71,16 +83,16 @@ function Tile({ label, value, tone }: { label: string; value: number; tone?: str
 
 export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   const params = await searchParams;
-  const view = params.view === "fixed" ? "fixed" : "open";
+  const view = params.view === "resolved" || params.view === "fixed" ? "resolved" : "open";
 
   const [connection, site] = await Promise.all([getConnection(), getCurrentSite()]);
   if (!connection) redirect("/connect");
   if (!site) return <p className="text-muted">No client sites yet.</p>;
 
   const { entries, crawl } = await getAudit(site.id);
-  const open = entries.filter((e) => e.state !== "fixed");
-  const fixed = entries.filter((e) => e.state === "fixed");
-  const shown = view === "open" ? open : fixed;
+  const open = entries.filter((e) => e.state === "open" || e.state === "returned");
+  const resolved = entries.filter((e) => e.state === "fixed" || e.state === "ignored");
+  const shown = view === "open" ? open : resolved;
   const groups = groupIssues(shown);
   const count = (s: Severity) => open.filter((e) => ISSUE_TYPES[e.type].severity === s).length;
 
@@ -108,19 +120,19 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
         <Tile label="High" value={count("high")} tone={count("high") ? "text-danger" : undefined} />
         <Tile label="Medium" value={count("med")} />
         <Tile label="Low" value={count("low")} />
-        <Tile label="Marked fixed" value={fixed.length} />
+        <Tile label="Resolved" value={resolved.length} />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label="Audit view" className="flex flex-wrap gap-2">
-          {(["open", "fixed"] as const).map((v) => (
+          {(["open", "resolved"] as const).map((v) => (
             <Link
               key={v}
-              href={v === "open" ? "/audit" : "/audit?view=fixed"}
+              href={v === "open" ? "/audit" : "/audit?view=resolved"}
               aria-current={v === view ? "page" : undefined}
               className={`btn min-h-10 px-4 ${v === view ? "btn-accent" : "border-line text-muted"}`}
             >
-              {v === "open" ? `To fix · ${open.length}` : `Marked fixed · ${fixed.length}`}
+              {v === "open" ? `To fix · ${open.length}` : `Resolved · ${resolved.length}`}
             </Link>
           ))}
         </nav>
@@ -138,7 +150,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
         <p className="panel p-5 text-sm text-muted sm:p-7">Crawl the site to run the audit.</p>
       ) : groups.length === 0 ? (
         <p className="panel p-5 text-sm leading-relaxed text-muted sm:p-7">
-          {view === "open" ? "Nothing to fix. The latest crawl found no problems." : "Nothing marked fixed."}
+          {view === "open" ? "Nothing to fix. The latest crawl found no problems." : "Nothing marked fixed or not an issue yet."}
         </p>
       ) : (
         <div className="flex flex-col gap-5">

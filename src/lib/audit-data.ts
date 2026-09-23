@@ -14,7 +14,7 @@ export async function getAudit(siteId: string): Promise<{ entries: AuditEntry[];
   const [overview, crawl, fixes] = await Promise.all([
     getOverview(siteId),
     getLatestCrawl(siteId),
-    db().from("audit_fixes").select("page_key, issue, fixed_at").eq("site_id", siteId),
+    db().from("audit_fixes").select("page_key, issue, fixed_at, kind").eq("site_id", siteId),
   ]);
   if (fixes.error) throw fixes.error;
   // Without Search Console data the report still lists crawled pages, with 0 impressions.
