@@ -6,9 +6,10 @@ const CRAWL_ROUTES = ["/api/crawl", "/performance", "/blueprints"];
 const nextConfig: NextConfig = {
   // Loaded from node_modules at runtime rather than bundled.
   serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
-  // The serverless Chromium binary is read from disk, so tracing can't see it.
+  // Both packages read files from disk at runtime (the Chromium binary, playwright's
+  // browsers.json), which tracing can't see, so ship them whole.
   outputFileTracingIncludes: Object.fromEntries(
-    CRAWL_ROUTES.map((route) => [route, ["./node_modules/@sparticuz/chromium/bin/**"]]),
+    CRAWL_ROUTES.map((route) => [route, ["./node_modules/@sparticuz/chromium/**", "./node_modules/playwright-core/**"]]),
   ),
 };
 
