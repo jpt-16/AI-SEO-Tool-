@@ -6,7 +6,7 @@ import { RefreshIcon, SearchIcon } from "./icons";
 
 const ACTIONS = {
   sync: { run: runSync, Icon: RefreshIcon, pending: "Syncing…" },
-  crawl: { run: runCrawl, Icon: SearchIcon, pending: "Crawling, about a minute…" },
+  crawl: { run: runCrawl, Icon: SearchIcon, pending: "Crawling, 1–2 minutes…" },
 } satisfies Record<string, { run: (prev: ActionState | null, data: FormData) => Promise<ActionState>; Icon: unknown; pending: string }>;
 
 export function ActionButton({

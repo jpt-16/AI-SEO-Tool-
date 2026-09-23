@@ -151,7 +151,8 @@ capture now records the page's HTTP status and failed requests, and the dashboar
 off. JavaScript-timed carousels are the one thing the freeze can't stop; they can change which slide
 is captured.
 
-Chromium comes from `@sparticuz/chromium` on Vercel. Locally, set `CHROMIUM_PATH` or run
+Chromium comes from `@sparticuz/chromium` on Vercel, where it runs single-process, so each page gets
+its own browser (about 5 seconds a page). Locally, set `CHROMIUM_PATH` or run
 `npx playwright-core install chromium` once. `VISUAL_CAPTURE=off` skips the step. A failed capture never
 fails the crawl.
 

@@ -15,9 +15,11 @@ const NAV_TIMEOUT_MS = 30_000;
 const QUIET_MS = 500;
 const QUIET_MAX_MS = 10_000;
 
+const isServerless = () => Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
 export async function launchBrowser(): Promise<Browser> {
   const { chromium } = await import("playwright-core");
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (isServerless()) {
     // Serverless: a Chromium build packaged for Lambda-style environments.
     const serverless = (await import("@sparticuz/chromium")).default;
     return chromium.launch({ executablePath: await serverless.executablePath(), args: serverless.args, headless: true });
@@ -287,12 +289,32 @@ export async function capturePage(browser: Browser, url: string): Promise<Visual
 
 export type VisualResult = VisualCapture | { url: string; error: string };
 
-// Captures pages two at a time in one browser; a page that fails gets an error, not a throw.
+const errorText = (err: unknown) => (err instanceof Error ? err.message.split("\n")[0] : String(err));
+
+// Captures every URL; a page that fails gets an error, not a throw. Locally, pages share
+// one browser, two at a time. Serverless Chromium runs --single-process, where closing a
+// page's context takes the whole browser down, so there each page gets its own browser,
+// one at a time. Either way every capture starts from the same fresh state.
 export async function captureSite(urls: string[], concurrency = 2, browser?: Browser): Promise<VisualResult[]> {
+  const results: VisualResult[] = new Array(urls.length);
+  if (!browser && isServerless()) {
+    for (let i = 0; i < urls.length; i++) {
+      let b: Browser | null = null;
+      try {
+        b = await launchBrowser();
+        results[i] = await capturePage(b, urls[i]);
+      } catch (err) {
+        results[i] = { url: urls[i], error: errorText(err) };
+      } finally {
+        await b?.close().catch(() => {});
+      }
+    }
+    return results;
+  }
+
   const own = !browser;
   const b = browser ?? (await launchBrowser());
   try {
-    const results: VisualResult[] = new Array(urls.length);
     let next = 0;
     const worker = async () => {
       while (next < urls.length) {
@@ -300,7 +322,7 @@ export async function captureSite(urls: string[], concurrency = 2, browser?: Bro
         try {
           results[i] = await capturePage(b, urls[i]);
         } catch (err) {
-          results[i] = { url: urls[i], error: err instanceof Error ? err.message.split("\n")[0] : String(err) };
+          results[i] = { url: urls[i], error: errorText(err) };
         }
       }
     };
