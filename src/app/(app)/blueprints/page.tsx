@@ -11,6 +11,7 @@ import {
   type BlueprintRun,
   type BlueprintStatus,
 } from "@/lib/blueprints";
+import { EFFORT_LABELS } from "@/lib/effort";
 import { formatDateTime, formatInt, formatPct } from "@/lib/format";
 import { getConnection } from "@/lib/google";
 import { getCurrentSite } from "@/lib/sites";
@@ -154,8 +155,11 @@ function LastRun({ run }: { run: BlueprintRun | null }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[13px] text-muted">
-        Last analysis {formatDateTime(run.finished_at ?? run.started_at)} · {run.pages_analyzed ?? 0} pages over{" "}
-        {run.min_impressions} impressions · {run.blueprints_created ?? 0} new blueprints
+        Last analysis {formatDateTime(run.finished_at ?? run.started_at)} · {run.pages_analyzed ?? 0} pages reviewed over{" "}
+        {run.min_impressions} impressions
+        {run.pages_reused ? ` · ${run.pages_reused} unchanged, not re-checked` : ""} · {run.blueprints_created ?? 0} new blueprints
+        {run.cost_usd !== null && ` · $${Number(run.cost_usd).toFixed(2)}`}
+        {run.effort && ` · ${EFFORT_LABELS[run.effort]} depth`}
       </p>
       {unchanged.length > 0 && (
         <details className="group border-t border-line pt-3 text-[13px]">
@@ -172,6 +176,9 @@ function LastRun({ run }: { run: BlueprintRun | null }) {
                 <span className="leading-relaxed text-soft">
                   {o.reason ?? "No reason recorded. Runs before this feature didn't ask for one; analyze again to get it."}
                 </span>
+                {o.reusedFrom && (
+                  <span className="text-xs text-muted">Unchanged since Claude reviewed it {formatDateTime(o.reusedFrom)}, so not re-checked.</span>
+                )}
               </li>
             ))}
           </ul>

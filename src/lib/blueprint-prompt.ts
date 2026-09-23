@@ -1,8 +1,36 @@
+import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { PageRow } from "./reports";
 
 export const BLUEPRINT_MODEL = "claude-sonnet-4-6";
+// USD per million tokens for BLUEPRINT_MODEL. Thinking tokens bill as output.
+export const BLUEPRINT_PRICING = { input: 3, output: 15 };
+
+export { DEFAULT_EFFORT, EFFORT_LABELS, EFFORTS, type Effort } from "./effort";
+
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+export function usageCost(inputTokens: number, outputTokens: number): Usage {
+  const costUsd = (inputTokens * BLUEPRINT_PRICING.input + outputTokens * BLUEPRINT_PRICING.output) / 1_000_000;
+  return { inputTokens, outputTokens, costUsd: Math.round(costUsd * 10_000) / 10_000 };
+}
+
+export function addUsage(a: Usage, b: Usage): Usage {
+  return usageCost(a.inputTokens + b.inputTokens, a.outputTokens + b.outputTokens);
+}
+
+// What a verdict depends on: the snippet and the searches the page shows up for. If none of
+// it changed since Claude last said "nothing to change", asking again would cost the same
+// and most likely say the same.
+export function snapshotSignature(page: Pick<PageSnapshot, "title" | "metaDescription" | "h1" | "topQueries">): string {
+  const parts = [page.title ?? "", page.metaDescription ?? "", page.h1.join("|"), page.topQueries.map((q) => q.query.toLowerCase()).sort().join("|")];
+  return createHash("sha256").update(parts.join("\n")).digest("hex").slice(0, 16);
+}
 
 export const BlueprintOutput = z.object({
   blueprint: z

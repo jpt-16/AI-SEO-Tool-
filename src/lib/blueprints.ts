@@ -8,8 +8,14 @@ import {
   describeAnthropicError,
   noPagesReason,
   selectPages,
+  snapshotSignature,
   SYSTEM_PROMPT,
+  addUsage,
+  DEFAULT_EFFORT,
+  usageCost,
   type BlueprintAnswer,
+  type Effort,
+  type Usage,
   type PageSnapshot,
 } from "./blueprint-prompt";
 import { pickTargetQueries, sortResults, type ResultDiff, type StatsSnapshot } from "./attribution-core";
@@ -26,9 +32,16 @@ export interface BlueprintRunOptions {
   minImpressions?: number;
   maxPages?: number;
   dryRun?: boolean;
+  // How much Claude reasons per page (most of the cost). Defaults to DEFAULT_EFFORT.
+  effort?: Effort;
+  // Re-review pages Claude cleared recently even if nothing about them changed.
+  recheck?: boolean;
   // Injected in tests; defaults to a client reading ANTHROPIC_API_KEY.
   client?: Pick<Anthropic, "messages">;
 }
+
+// A "nothing to change" verdict is reused for this long if the page hasn't changed.
+const REUSE_DAYS = 30;
 
 export interface PageOutcome {
   page_key: string;
@@ -36,6 +49,11 @@ export interface PageOutcome {
   outcome: "blueprint" | "none" | "error" | "skipped";
   // Claude's reason when the outcome is "none".
   reason?: string;
+  // snapshotSignature() of what Claude saw, so an unchanged page can reuse this verdict.
+  signature?: string;
+  // Set when this "none" was carried over from an earlier review instead of a new call.
+  reusedFrom?: string;
+  usage?: Usage;
   error?: string;
 }
 
@@ -44,7 +62,11 @@ export interface BlueprintRunResult {
   pagesConsidered: number;
   pagesAnalyzed: number;
   blueprintsCreated: number;
+  // Pages whose earlier "nothing to change" verdict was reused.
+  pagesReused: number;
   outcomes: PageOutcome[];
+  usage: Usage;
+  effort: Effort;
   // Why nothing was analyzed, when that's the case.
   note?: string;
   error?: string;
@@ -54,19 +76,20 @@ export async function analyzePage(
   client: Pick<Anthropic, "messages">,
   business: { name: string; domain: string },
   snapshot: PageSnapshot,
-): Promise<BlueprintAnswer> {
+  effort: Effort = DEFAULT_EFFORT,
+): Promise<{ answer: BlueprintAnswer; usage: Usage }> {
   const response = await client.messages.parse({
     model: BLUEPRINT_MODEL,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: buildUserPrompt(business, snapshot) }],
-    output_config: { format: zodOutputFormat(BlueprintOutput) },
+    output_config: { format: zodOutputFormat(BlueprintOutput), effort },
   });
   if (response.stop_reason === "refusal") throw new Error("Claude declined to analyze this page.");
   if (response.stop_reason === "max_tokens") throw new Error("Claude's answer was cut off (max_tokens).");
   if (!response.parsed_output) throw new Error("Claude's answer didn't match the blueprint format.");
-  return response.parsed_output;
+  return { answer: response.parsed_output, usage: usageCost(response.usage.input_tokens, response.usage.output_tokens) };
 }
 
 async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -82,13 +105,51 @@ async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => P
   return results;
 }
 
+// The latest "nothing to change" verdict per page from the last REUSE_DAYS, with the
+// signature of what Claude saw then.
+async function recentVerdicts(siteId: string): Promise<Map<string, PageOutcome & { at: string }>> {
+  const since = new Date(Date.now() - REUSE_DAYS * 86_400_000).toISOString();
+  const { data, error } = await db()
+    .from("blueprint_runs")
+    .select("results, started_at")
+    .eq("site_id", siteId)
+    .eq("status", "succeeded")
+    .gte("started_at", since)
+    .order("started_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  const verdicts = new Map<string, PageOutcome & { at: string }>();
+  const seen = new Set<string>();
+  for (const run of data as { results: PageOutcome[]; started_at: string }[]) {
+    for (const o of run.results ?? []) {
+      // Only the page's latest outcome counts; an older "none" doesn't outlive a newer blueprint.
+      if (seen.has(o.page_key) || o.outcome === "skipped" || o.outcome === "error") continue;
+      seen.add(o.page_key);
+      // Reused verdicts carry the original review date, so reuse can't chain past REUSE_DAYS.
+      const reviewedAt = o.reusedFrom ?? run.started_at;
+      if (o.outcome === "none" && o.signature && reviewedAt >= since) verdicts.set(o.page_key, { ...o, at: reviewedAt });
+    }
+  }
+  return verdicts;
+}
+
 export async function runBlueprints(
   siteId: string,
   trigger: BlueprintTrigger,
   options: BlueprintRunOptions = {},
 ): Promise<BlueprintRunResult> {
   const minImpressions = options.minImpressions ?? DEFAULT_MIN_IMPRESSIONS;
-  const result: BlueprintRunResult = { ok: false, pagesConsidered: 0, pagesAnalyzed: 0, blueprintsCreated: 0, outcomes: [] };
+  const effort = options.effort ?? DEFAULT_EFFORT;
+  const result: BlueprintRunResult = {
+    ok: false,
+    pagesConsidered: 0,
+    pagesAnalyzed: 0,
+    blueprintsCreated: 0,
+    pagesReused: 0,
+    outcomes: [],
+    usage: usageCost(0, 0),
+    effort,
+  };
 
   const { data: site, error: siteError } = await db().from("sites").select("id, name, domain").eq("id", siteId).maybeSingle();
   if (siteError) throw siteError;
@@ -134,7 +195,7 @@ export async function runBlueprints(
 
   const { data: run, error: runError } = await db()
     .from("blueprint_runs")
-    .insert({ site_id: siteId, trigger, model: BLUEPRINT_MODEL, min_impressions: minImpressions, pages_considered: result.pagesConsidered })
+    .insert({ site_id: siteId, trigger, model: BLUEPRINT_MODEL, effort, min_impressions: minImpressions, pages_considered: result.pagesConsidered })
     .select("id")
     .single();
   if (runError) throw runError;
@@ -152,6 +213,7 @@ export async function runBlueprints(
       .in("page_key", pages.map((p) => p.pageKey));
     if (crawlError) throw crawlError;
     const h2ByKey = new Map(crawlRows.map((r) => [r.page_key as string, (r.h2 as string[]) ?? []]));
+    const earlier = options.recheck ? new Map<string, PageOutcome & { at: string }>() : await recentVerdicts(siteId);
 
     const outcomes = await mapConcurrent(pages, CONCURRENCY, async (page): Promise<PageOutcome> => {
       const c = page.crawl!;
@@ -169,10 +231,16 @@ export async function runBlueprints(
         position: page.position,
         topQueries: page.topQueries.map((q) => ({ ...q, ctr: q.impressions ? q.clicks / q.impressions : 0 })),
       };
-      const base = { page_key: page.pageKey, url: page.url };
+      const signature = snapshotSignature(snapshot);
+      const base = { page_key: page.pageKey, url: page.url, signature };
+      const previous = earlier.get(page.pageKey);
+      if (previous && previous.signature === signature) {
+        return { ...base, outcome: "none", reason: previous.reason, reusedFrom: previous.at };
+      }
       try {
-        const { blueprint, no_change_reason } = await analyzePage(client, site, snapshot);
-        if (!blueprint) return { ...base, outcome: "none", ...(no_change_reason ? { reason: no_change_reason } : {}) };
+        const { answer, usage } = await analyzePage(client, site, snapshot, effort);
+        const { blueprint, no_change_reason } = answer;
+        if (!blueprint) return { ...base, usage, outcome: "none", ...(no_change_reason ? { reason: no_change_reason } : {}) };
         const { target_queries, ...fields } = blueprint;
         const { error } = await db().from("blueprints").insert({
           site_id: siteId,
@@ -185,9 +253,9 @@ export async function runBlueprints(
           run_id: run.id,
         });
         // 23505: another run opened a blueprint for this page meanwhile.
-        if (error?.code === "23505") return { ...base, outcome: "skipped", error: "Already has an open blueprint." };
+        if (error?.code === "23505") return { ...base, usage, outcome: "skipped", error: "Already has an open blueprint." };
         if (error) throw new Error(`Saving blueprint failed: ${error.message}`);
-        return { ...base, outcome: "blueprint" };
+        return { ...base, usage, outcome: "blueprint" };
       } catch (err) {
         if (err instanceof Anthropic.AuthenticationError) throw err;
         return { ...base, outcome: "error", error: describeAnthropicError(err) };
@@ -195,7 +263,9 @@ export async function runBlueprints(
     });
 
     result.outcomes.push(...outcomes);
-    result.pagesAnalyzed = outcomes.filter((o) => o.outcome === "blueprint" || o.outcome === "none").length;
+    result.usage = outcomes.reduce((sum, o) => (o.usage ? addUsage(sum, o.usage) : sum), usageCost(0, 0));
+    result.pagesReused = outcomes.filter((o) => o.reusedFrom).length;
+    result.pagesAnalyzed = outcomes.filter((o) => (o.outcome === "blueprint" || o.outcome === "none") && !o.reusedFrom).length;
     result.blueprintsCreated = outcomes.filter((o) => o.outcome === "blueprint").length;
     const failed = outcomes.filter((o) => o.outcome === "error");
     result.ok = failed.length < outcomes.length || outcomes.length === 0;
@@ -209,7 +279,11 @@ export async function runBlueprints(
     .update({
       status: result.ok ? "succeeded" : "failed",
       pages_analyzed: result.pagesAnalyzed,
+      pages_reused: result.pagesReused,
       blueprints_created: result.blueprintsCreated,
+      input_tokens: result.usage.inputTokens,
+      output_tokens: result.usage.outputTokens,
+      cost_usd: result.usage.costUsd,
       results: result.outcomes,
       error: result.error ?? null,
       finished_at: new Date().toISOString(),
@@ -288,6 +362,9 @@ export async function listResults(siteId: string): Promise<Blueprint[]> {
 
 export interface BlueprintRun {
   status: "running" | "succeeded" | "failed";
+  effort: Effort | null;
+  pages_reused: number | null;
+  cost_usd: number | null;
   min_impressions: number;
   pages_considered: number | null;
   pages_analyzed: number | null;
@@ -301,7 +378,7 @@ export interface BlueprintRun {
 export async function getLatestBlueprintRun(siteId: string): Promise<BlueprintRun | null> {
   const { data, error } = await db()
     .from("blueprint_runs")
-    .select("status, min_impressions, pages_considered, pages_analyzed, blueprints_created, error, results, started_at, finished_at")
+    .select("status, min_impressions, pages_considered, pages_analyzed, blueprints_created, effort, pages_reused, cost_usd, error, results, started_at, finished_at")
     .eq("site_id", siteId)
     .order("started_at", { ascending: false })
     .limit(1)

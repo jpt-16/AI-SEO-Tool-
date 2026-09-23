@@ -237,7 +237,20 @@ click) or with the script:
 ```bash
 npm run blueprints -- --dry-run                     # list qualifying pages, no API calls
 npm run blueprints -- --min-impressions=10 --max-pages=5
+npm run blueprints -- --effort=low --recheck        # cheapest depth; re-review unchanged pages
 ```
+
+**Cost.** Most of the cost is Claude's thinking, which bills as output tokens ($15/MTok vs $3/MTok
+input). Two things keep it down:
+
+- **Depth** (`output_config.effort`): Quick = `low`, Standard = `medium` (default), Thorough = `high`.
+- **Reuse**: if Claude said "nothing to change" for a page in the last 30 days and its title, meta, H1s
+  and top queries haven't changed (`snapshotSignature()`), that verdict is reused without a call. Tick
+  **Re-check pages Claude already cleared** (or pass `--recheck`) to review them anyway. Reuse never
+  extends past 30 days from the original review.
+
+Each run stores `effort`, `pages_reused`, `input_tokens`, `output_tokens` and `cost_usd` in
+`blueprint_runs`, and the Blueprints page shows the last run's actual cost.
 
 ## Results (attribution)
 

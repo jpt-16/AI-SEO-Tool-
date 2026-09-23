@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ISSUE_TYPES } from "@/lib/audit";
 import { markBlueprintDone } from "@/lib/attribution";
 import { DEFAULT_MIN_IMPRESSIONS, runBlueprints } from "@/lib/blueprints";
+import { isEffort } from "@/lib/effort";
 import { runSiteCrawl } from "@/lib/crawl-run";
 import { decryptSecret } from "@/lib/crypto";
 import { requireEnv } from "@/lib/env";
@@ -78,15 +79,23 @@ export async function runCrawl(_prev: ActionState | null, formData: FormData): P
 export async function generateBlueprints(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
   const minImpressions = Math.max(0, Math.floor(Number(formData.get("minImpressions") ?? DEFAULT_MIN_IMPRESSIONS)));
   if (!Number.isFinite(minImpressions)) return { ok: false, message: "Minimum impressions must be a number." };
-  const result = await runBlueprints(String(formData.get("siteId") ?? ""), "manual", { minImpressions, maxPages: 10 });
+  const effort = String(formData.get("effort") ?? "");
+  const result = await runBlueprints(String(formData.get("siteId") ?? ""), "manual", {
+    minImpressions,
+    maxPages: 10,
+    effort: isEffort(effort) ? effort : undefined,
+    recheck: formData.get("recheck") === "1",
+  });
   revalidatePath("/blueprints");
   if (!result.ok) return { ok: false, message: result.error ?? "Analysis failed." };
   if (result.pagesConsidered === 0) return { ok: true, message: result.note ?? "No pages qualify." };
   const skipped = result.outcomes.filter((o) => o.outcome === "skipped").length;
   const errors = result.outcomes.filter((o) => o.outcome === "error").length;
   const parts = [`Analyzed ${result.pagesAnalyzed} pages`, `${result.blueprintsCreated} new blueprints`];
+  if (result.pagesReused) parts.push(`${result.pagesReused} unchanged, not re-checked`);
   if (skipped) parts.push(`${skipped} already open`);
   if (errors) parts.push(`${errors} failed`);
+  parts.push(`cost $${result.usage.costUsd.toFixed(2)}`);
   return { ok: true, message: `${parts.join(" · ")}.` };
 }
 

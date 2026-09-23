@@ -6,7 +6,9 @@ import {
   describeAnthropicError,
   noPagesReason,
   selectPages,
+  snapshotSignature,
   SYSTEM_PROMPT,
+  usageCost,
   type PageSnapshot,
 } from "./blueprint-prompt";
 import type { PageRow } from "./reports";
@@ -157,5 +159,29 @@ describe("describeAnthropicError", () => {
       new Headers(),
     );
     expect(describeAnthropicError(err)).toMatch(/API key was rejected/);
+  });
+});
+
+describe("usageCost", () => {
+  it("prices input and output tokens per million", () => {
+    expect(usageCost(1_000_000, 0).costUsd).toBe(3);
+    expect(usageCost(0, 1_000_000).costUsd).toBe(15);
+    expect(usageCost(4000, 2000)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.042 });
+  });
+});
+
+describe("snapshotSignature", () => {
+  it("ignores query order and case, and the numbers around them", () => {
+    const queries = [...snapshot.topQueries, { query: "car detailing near me", clicks: 0, impressions: 40, ctr: 0, position: 18 }];
+    const a = snapshotSignature({ ...snapshot, topQueries: queries });
+    const reordered = { ...snapshot, clicks: 99, topQueries: [...queries].reverse().map((q) => ({ ...q, query: q.query.toUpperCase(), impressions: 1 })) };
+    expect(snapshotSignature(reordered)).toBe(a);
+  });
+
+  it("changes when the snippet or the queries change", () => {
+    const a = snapshotSignature(snapshot);
+    expect(snapshotSignature({ ...snapshot, title: "Something else" })).not.toBe(a);
+    expect(snapshotSignature({ ...snapshot, metaDescription: "New meta" })).not.toBe(a);
+    expect(snapshotSignature({ ...snapshot, topQueries: snapshot.topQueries.slice(1) })).not.toBe(a);
   });
 });
