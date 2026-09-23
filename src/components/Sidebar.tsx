@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { selectSite } from "@/app/(app)/actions";
 import type { Site } from "@/lib/sites";
 import { ChevronsIcon } from "./icons";
@@ -58,6 +59,14 @@ function NavBody({ sites, current, connected }: Props) {
           </>
         )}
       </div>
+      <nav aria-label="Legal" className="-mt-3 flex gap-4 text-xs">
+        <Link href="/privacy" className="text-muted no-underline hover:text-ink">
+          Privacy
+        </Link>
+        <Link href="/terms" className="text-muted no-underline hover:text-ink">
+          Terms
+        </Link>
+      </nav>
     </>
   );
 }

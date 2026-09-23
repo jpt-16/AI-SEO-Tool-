@@ -20,7 +20,8 @@ Styled with the "Nocturne" tokens from jtbuildsco.com.
 - **Screens:** Connect → Search performance (totals, Queries/Pages tables, filter, CSV export) →
   Connections (account, property picker, daily sync toggle, sync history).
 - **Triggers:** "Sync now" button, `POST /api/gsc/sync`, and a Vercel Cron job every day at 11:00 UTC.
-- The whole app sits behind HTTP Basic auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`).
+- The app sits behind HTTP Basic auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`), except the public
+  homepage, privacy policy and terms.
 
 ## Setup
 
@@ -79,6 +80,14 @@ has access to cloverdownsdetailing.com in Search Console. Then, on **Connections
    `CRON_SECRET` as a Bearer token.
 4. Open the production URL and connect Google there. The connection is stored in Supabase, so it's shared
    by every environment that uses the same database.
+
+## Public pages
+
+`/` (what the tool is), `/privacy` and `/terms` are public; everything else stays behind the admin
+login. Google needs all three reachable without signing in before it will verify the OAuth app and
+move it out of Testing mode (which is what stops the 7-day token expiry). Operator details live in
+`src/lib/legal.ts`; bump `LEGAL_UPDATED` when the policy changes. Every response also carries security
+headers (HSTS, no framing, nosniff, strict referrer, permissions policy).
 
 ## API
 
