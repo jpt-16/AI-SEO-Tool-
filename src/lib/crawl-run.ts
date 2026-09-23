@@ -23,17 +23,22 @@ export interface CrawlResult {
 export interface RunCrawlOptions extends CrawlOptions {
   // Headless-browser capture and scoring; on unless false or VISUAL_CAPTURE=off.
   visual?: boolean;
+  // Stop starting visual captures this long after the crawl starts. Defaults to
+  // VISUAL_BUDGET_MS on serverless (functions stop at 300s), unlimited elsewhere.
+  visualBudgetMs?: number;
 }
+
+const VISUAL_BUDGET_MS = 240_000;
 
 const errorText = (err: unknown) =>
   err instanceof Error ? err.message.split("\n")[0] : String((err as { message?: string })?.message ?? err);
 
 // Captures every page that loaded and stores its score, checks and screenshot.
-async function captureVisuals(siteId: string, urls: string[], result: CrawlResult) {
+async function captureVisuals(siteId: string, urls: string[], result: CrawlResult, deadline: number) {
   const capturedAt = new Date().toISOString();
   let captures;
   try {
-    captures = await captureSite(urls);
+    captures = await captureSite(urls, undefined, undefined, deadline);
   } catch (err) {
     result.visualError = `Visual capture couldn't start: ${errorText(err)}`;
     return;
@@ -60,10 +65,17 @@ async function captureVisuals(siteId: string, urls: string[], result: CrawlResul
   }
   result.visualFailed = captures.filter((c) => "error" in c).length;
   result.visualPages = captures.length - result.visualFailed;
+  const skipped = urls.length - captures.length;
+  if (skipped > 0) {
+    result.visualError = `Stopped at the time limit after ${captures.length} of ${urls.length} pages; the other ${skipped} keep their previous visual scores.`;
+  }
 }
 
 export async function runSiteCrawl(siteId: string, trigger: CrawlTrigger, options: RunCrawlOptions = {}): Promise<CrawlResult> {
   const result: CrawlResult = { siteId, ok: false, pagesCrawled: 0, pagesFailed: 0 };
+  const started = Date.now();
+  const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const visualBudget = options.visualBudgetMs ?? (serverless ? VISUAL_BUDGET_MS : Number.POSITIVE_INFINITY);
   let aeo: SiteAeo | null = null;
 
   const { data: site, error: siteError } = await db().from("sites").select("id, domain").eq("id", siteId).maybeSingle();
@@ -115,7 +127,7 @@ export async function runSiteCrawl(siteId: string, trigger: CrawlTrigger, option
     const loaded = pages.filter((p) => !p.error && p.title !== undefined).map((p) => p.url);
     aeo = await checkSiteAeo(`https://${site.domain}`, loaded, { userAgent: CRAWLER_USER_AGENT, fetchImpl: options.fetchImpl });
     if (options.visual !== false && process.env.VISUAL_CAPTURE !== "off" && loaded.length) {
-      await captureVisuals(siteId, loaded, result);
+      await captureVisuals(siteId, loaded, result, started + visualBudget);
     }
   } catch (err) {
     result.error = errorText(err);

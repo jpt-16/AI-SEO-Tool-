@@ -295,10 +295,18 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message.split("\
 // one browser, two at a time. Serverless Chromium runs --single-process, where closing a
 // page's context takes the whole browser down, so there each page gets its own browser,
 // one at a time. Either way every capture starts from the same fresh state.
-export async function captureSite(urls: string[], concurrency = 2, browser?: Browser): Promise<VisualResult[]> {
+// With a deadline (epoch ms), no capture starts after it, and only URLs that were
+// attempted come back.
+export async function captureSite(
+  urls: string[],
+  concurrency = 2,
+  browser?: Browser,
+  deadline = Number.POSITIVE_INFINITY,
+): Promise<VisualResult[]> {
   const results: VisualResult[] = new Array(urls.length);
+  const done = () => results.filter((r) => r !== undefined);
   if (!browser && isServerless()) {
-    for (let i = 0; i < urls.length; i++) {
+    for (let i = 0; i < urls.length && Date.now() < deadline; i++) {
       let b: Browser | null = null;
       try {
         b = await launchBrowser();
@@ -309,7 +317,7 @@ export async function captureSite(urls: string[], concurrency = 2, browser?: Bro
         await b?.close().catch(() => {});
       }
     }
-    return results;
+    return done();
   }
 
   const own = !browser;
@@ -317,7 +325,7 @@ export async function captureSite(urls: string[], concurrency = 2, browser?: Bro
   try {
     let next = 0;
     const worker = async () => {
-      while (next < urls.length) {
+      while (next < urls.length && Date.now() < deadline) {
         const i = next++;
         try {
           results[i] = await capturePage(b, urls[i]);
@@ -327,7 +335,7 @@ export async function captureSite(urls: string[], concurrency = 2, browser?: Bro
       }
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, urls.length) }, worker));
-    return results;
+    return done();
   } finally {
     if (own) await b.close();
   }

@@ -73,7 +73,8 @@ Rules for the recommendation:
 - target_queries lists the queries from the data this change targets, copied exactly as given. The result is measured on them later.
 - priority: high = a clear mismatch on queries with real impressions at page 1-2 positions, likely to gain clicks soon; med = a clear improvement with modest volume; low = minor polish.
 - If the title and meta already fit the demand, or the data is too thin to justify a change, set blueprint to null. An empty result is a good outcome; never manufacture a recommendation to have something to say.
-- With a null blueprint, give no_change_reason: one plain sentence naming the specific data behind the decision (for example, which queries, how many impressions, what position). With a blueprint, no_change_reason is null.`;
+- With a null blueprint, give no_change_reason: one plain sentence naming the specific data behind the decision (for example, which queries, how many impressions, what position). With a blueprint, no_change_reason is null.
+- When you mention a search query inside finding, reasoning or no_change_reason, wrap it in single quotes ('like this'), never double quotes.`;
 
 const fmtLen = (text: string | null) => (text ? `${text} (${text.length} chars)` : "(missing)");
 

@@ -41,6 +41,8 @@ describe("buildUserPrompt", () => {
     expect(SYSTEM_PROMPT).toMatch(/set blueprint to null/);
     expect(SYSTEM_PROMPT).toMatch(/never manufacture a recommendation/);
     expect(SYSTEM_PROMPT).toMatch(/no_change_reason/);
+    // Double quotes inside the JSON text fields cut Claude's sentences short.
+    expect(SYSTEM_PROMPT).toMatch(/single quotes/);
   });
 });
 

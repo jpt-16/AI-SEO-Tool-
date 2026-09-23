@@ -31,7 +31,7 @@ function CrawlBar({ siteId, crawl }: { siteId: string; crawl: CrawlRun | null })
         <div className="flex flex-col gap-1">
           <span className={`text-[13px] ${crawl?.status === "failed" ? "text-danger" : "text-muted"}`}>{status}</span>
           {done && crawl.visual_error && <span className="text-[13px] text-danger">{crawl.visual_error}</span>}
-          {done && !crawl.visual_error && crawl.visual_pages !== null && (
+          {done && !crawl.visual_error?.startsWith("Visual capture couldn") && crawl.visual_pages !== null && (
             <span className="text-[13px] text-muted">
               Visual scores for {crawl.visual_pages} pages{crawl.visual_failed ? ` · ${crawl.visual_failed} couldn’t be captured` : ""}
             </span>

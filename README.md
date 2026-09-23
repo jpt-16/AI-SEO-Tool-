@@ -115,7 +115,10 @@ npm run crawl -- cloverdownsdetailing.com   # one site
 curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" -X POST https://<domain>/api/crawl   # deployed app
 ```
 
-Or click **Crawl site** on the Pages tab. The Pages tab shows every page's Search Console stats and top
+Or click **Crawl site** on the Pages tab. Every site is also re-crawled automatically each Monday at
+10:00 UTC (`/api/cron/crawl`, Bearer `CRON_SECRET`), each site in its own function call so each gets the
+full 5-minute limit. On Vercel, visual capture stops starting new pages after 4 minutes; pages it
+doesn't reach keep their previous scores and the crawl bar says so. The Pages tab shows every page's Search Console stats and top
 queries next to its current title, meta description, H1 and content facts. Query words that don't appear
 in the page's title are underlined.
 
