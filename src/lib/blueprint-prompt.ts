@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { PageRow } from "./reports";
 
-// Override with GEMINI_MODEL (and the two prices, if the model isn't gemini-2.5-flash).
-export const BLUEPRINT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// Override with GEMINI_MODEL (and the two prices, if the model isn't gemini-3.5-flash).
+export const BLUEPRINT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 // USD per million tokens for BLUEPRINT_MODEL. Thinking tokens bill as output.
 export const BLUEPRINT_PRICING = {
-  input: Number(process.env.GEMINI_INPUT_USD_PER_MTOK) || 0.3,
-  output: Number(process.env.GEMINI_OUTPUT_USD_PER_MTOK) || 2.5,
+  input: Number(process.env.GEMINI_INPUT_USD_PER_MTOK) || 1.5,
+  output: Number(process.env.GEMINI_OUTPUT_USD_PER_MTOK) || 9,
 };
 
 export { DEFAULT_EFFORT, EFFORT_LABELS, EFFORTS, type Effort } from "./effort";

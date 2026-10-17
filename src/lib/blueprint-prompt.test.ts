@@ -132,9 +132,9 @@ describe("selectPages", () => {
 
 describe("usageCost", () => {
   it("prices input and output tokens per million", () => {
-    expect(usageCost(1_000_000, 0).costUsd).toBe(0.3);
-    expect(usageCost(0, 1_000_000).costUsd).toBe(2.5);
-    expect(usageCost(4000, 2000)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.0062 });
+    expect(usageCost(1_000_000, 0).costUsd).toBe(1.5);
+    expect(usageCost(0, 1_000_000).costUsd).toBe(9);
+    expect(usageCost(4000, 2000)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.024 });
   });
 });
 

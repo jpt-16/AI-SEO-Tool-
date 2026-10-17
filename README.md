@@ -60,7 +60,7 @@ Copy `.env.example` to `.env.local` and fill it in:
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Your login for the app |
 | `CRON_SECRET` | `openssl rand -hex 32` |
 | `GEMINI_API_KEY` | From aistudio.google.com → Get API key (Blueprints feature). Use a billing-enabled project: free-tier prompts can be used to improve Google's products |
-| `GEMINI_MODEL` (optional) | Defaults to `gemini-2.5-flash`. If you change it, also set `GEMINI_INPUT_USD_PER_MTOK` and `GEMINI_OUTPUT_USD_PER_MTOK` so the cost shown is right |
+| `GEMINI_MODEL` (optional) | Defaults to `gemini-3.5-flash`. If you change it, also set `GEMINI_INPUT_USD_PER_MTOK` and `GEMINI_OUTPUT_USD_PER_MTOK` so the cost shown is right |
 
 ### 4. Run it
 
@@ -212,7 +212,7 @@ Both show under **Resolved**. Issues are recomputed on every view, so nothing go
 
 ## Blueprints (AI review)
 
-`src/lib/blueprints.ts` asks Gemini (`gemini-2.5-flash`, via the Gemini API `generateContent` endpoint, see
+`src/lib/blueprints.ts` asks Gemini (`gemini-3.5-flash`, via the Gemini API `generateContent` endpoint, see
 `src/lib/gemini.ts`) to review each page people are finding. For every page with more than 20 impressions in the last 90
 days (adjustable) that the crawler has seen, it sends the page's title, meta description, H1/H2s, word
 count, schema types and its top 5 queries (impressions, clicks, CTR, position). Gemini returns
@@ -242,10 +242,10 @@ npm run blueprints -- --min-impressions=10 --max-pages=5
 npm run blueprints -- --effort=low --recheck        # cheapest depth; re-review unchanged pages
 ```
 
-**Cost.** Most of the cost is the model's thinking, which bills as output tokens ($2.50/MTok vs $0.30/MTok
-input for `gemini-2.5-flash`). Two things keep it down:
+**Cost.** Most of the cost is the model's thinking, which bills as output tokens ($9/MTok vs $1.50/MTok
+input for `gemini-3.5-flash`). Two things keep it down:
 
-- **Depth** (`thinkingBudget`, see `THINKING_BUDGET` in `src/lib/effort.ts`): Quick = 512 tokens, Standard = 2048 (default), Thorough = 8192.
+- **Depth** (`thinkingLevel`): Quick = `low`, Standard = `medium` (default), Thorough = `high`.
 - **Reuse**: if the model said "nothing to change" for a page in the last 30 days and its title, meta, H1s
   and top queries haven't changed (`snapshotSignature()`), that verdict is reused without a call. Tick
   **Re-check pages already cleared** (or pass `--recheck`) to review them anyway. Reuse never

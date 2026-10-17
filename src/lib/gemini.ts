@@ -18,13 +18,15 @@ export class GeminiError extends Error {
   }
 }
 
+export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
 export interface GeminiRequest<T> {
   model: string;
   system: string;
   prompt: string;
   schema: z.ZodType<T>;
-  // 0 turns thinking off. Thinking tokens bill as output.
-  thinkingBudget: number;
+  // How much the model thinks before answering. Thinking tokens bill as output.
+  thinkingLevel: ThinkingLevel;
   // Counts thinking and answer together.
   maxOutputTokens: number;
 }
@@ -95,7 +97,7 @@ export function createGeminiClient(apiKey: string, fetchImpl: typeof fetch = fet
           responseMimeType: "application/json",
           responseJsonSchema: jsonSchema(request.schema),
           maxOutputTokens: request.maxOutputTokens,
-          thinkingConfig: { thinkingBudget: request.thinkingBudget },
+          thinkingConfig: { thinkingLevel: request.thinkingLevel },
         },
       });
 

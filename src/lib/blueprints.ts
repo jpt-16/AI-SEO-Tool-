@@ -16,7 +16,6 @@ import {
   type PageSnapshot,
 } from "./blueprint-prompt";
 import { createGeminiClient, describeAiError, GeminiError, type GeminiClient } from "./gemini";
-import { THINKING_BUDGET } from "./effort";
 import { pickTargetQueries, sortResults, type ResultDiff, type StatsSnapshot } from "./attribution-core";
 import { runSiteCrawl } from "./crawl-run";
 import { getOverview, getPageReport } from "./reports";
@@ -82,7 +81,7 @@ export async function analyzePage(
     system: SYSTEM_PROMPT,
     prompt: buildUserPrompt(business, snapshot),
     schema: BlueprintOutput,
-    thinkingBudget: THINKING_BUDGET[effort],
+    thinkingLevel: effort,
     maxOutputTokens: 16000,
   });
   return { answer: parsed, usage: usageCost(inputTokens, outputTokens) };
