@@ -42,9 +42,9 @@ export function AnalyzeForm({ siteId, defaultMinImpressions }: { siteId: string;
       </div>
       <label className="flex items-center gap-2.5 text-[13px] text-soft">
         <input type="checkbox" name="recheck" value="1" className="size-4 accent-accent-500" />
-        Re-check pages Claude already cleared, even if nothing on them changed
+        Re-check pages already cleared, even if nothing on them changed
       </label>
-      {pending && <span className="text-xs text-muted">Claude is reviewing each page. This can take a minute.</span>}
+      {pending && <span className="text-xs text-muted">Gemini is reviewing each page. This can take a minute.</span>}
       {state && !pending && (
         <span role="status" className={`text-[13px] ${state.ok ? "text-accent-300" : "text-danger"}`}>
           {state.message}

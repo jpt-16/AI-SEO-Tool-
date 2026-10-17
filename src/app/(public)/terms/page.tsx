@@ -57,7 +57,7 @@ export default function Terms() {
       <Section title="Availability">
         <p>
           We aim to keep the tool running but don&apos;t promise it will always be available or error-free. It depends on
-          services we don&apos;t control, including Google, Anthropic, Supabase and Vercel.
+          services we don&apos;t control, including Google, Supabase and Vercel.
         </p>
       </Section>
 

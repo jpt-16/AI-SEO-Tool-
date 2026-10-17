@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { PageRow } from "./reports";
 
-export const BLUEPRINT_MODEL = "claude-sonnet-4-6";
+// Override with GEMINI_MODEL (and the two prices, if the model isn't gemini-2.5-flash).
+export const BLUEPRINT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 // USD per million tokens for BLUEPRINT_MODEL. Thinking tokens bill as output.
-export const BLUEPRINT_PRICING = { input: 3, output: 15 };
+export const BLUEPRINT_PRICING = {
+  input: Number(process.env.GEMINI_INPUT_USD_PER_MTOK) || 0.3,
+  output: Number(process.env.GEMINI_OUTPUT_USD_PER_MTOK) || 2.5,
+};
 
 export { DEFAULT_EFFORT, EFFORT_LABELS, EFFORTS, type Effort } from "./effort";
 
@@ -25,7 +28,7 @@ export function addUsage(a: Usage, b: Usage): Usage {
 }
 
 // What a verdict depends on: the snippet and the searches the page shows up for. If none of
-// it changed since Claude last said "nothing to change", asking again would cost the same
+// it changed since the model last said "nothing to change", asking again would cost the same
 // and most likely say the same.
 export function snapshotSignature(page: Pick<PageSnapshot, "title" | "metaDescription" | "h1" | "topQueries">): string {
   const parts = [page.title ?? "", page.metaDescription ?? "", page.h1.join("|"), page.topQueries.map((q) => q.query.toLowerCase()).sort().join("|")];
@@ -63,7 +66,7 @@ export interface SnapshotQuery {
   position: number;
 }
 
-// Everything Claude sees about a page; stored with the blueprint as page_snapshot.
+// Everything the model sees about a page; stored with the blueprint as page_snapshot.
 export interface PageSnapshot {
   url: string;
   window: { startDate: string; endDate: string };
@@ -136,17 +139,6 @@ export function selectPages(rows: PageRow[], minImpressions: number): PageRow[] 
   return rows
     .filter((r) => r.impressions > minImpressions && r.crawl && !r.crawl.error)
     .sort((a, b) => b.impressions - a.impressions);
-}
-
-export function describeAnthropicError(err: unknown): string {
-  if (err instanceof Anthropic.AuthenticationError) return "The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in Vercel.";
-  if (err instanceof Anthropic.RateLimitError) return "Anthropic rate limit hit. Try again in a minute.";
-  if (err instanceof Anthropic.APIError) {
-    // The API's own message is already plain English (e.g. "Your credit balance is too low…").
-    const apiMessage = (err.error as { error?: { message?: string } } | undefined)?.error?.message;
-    return `Anthropic API error${err.status ? ` ${err.status}` : ""}: ${apiMessage ?? err.message}`;
-  }
-  return err instanceof Error ? err.message : String(err);
 }
 
 // Why no page qualified, in terms the dashboard can act on.

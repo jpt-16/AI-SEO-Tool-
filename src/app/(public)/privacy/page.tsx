@@ -106,10 +106,10 @@ export default function PrivacyPolicy() {
             <strong className="font-medium text-ink">Vercel</strong> hosts and runs the tool (United States).
           </li>
           <li>
-            <strong className="font-medium text-ink">Anthropic</strong> provides the AI model (Claude) behind recommendations.
+            <strong className="font-medium text-ink">Google (Gemini API)</strong> provides the AI model behind recommendations.
             For each page we ask it to review, it receives the page&apos;s address, title, description, headings, word count
             and structured-data types, plus that page&apos;s top five Search Console searches with their clicks, impressions,
-            click-through rate and position. Anthropic processes this to return the recommendation and, under its commercial
+            click-through rate and position. Google processes this to return the recommendation and, under the paid Gemini API
             terms, doesn&apos;t use it to train its models.
           </li>
           <li>

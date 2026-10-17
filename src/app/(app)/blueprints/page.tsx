@@ -98,7 +98,7 @@ function BlueprintCard({ blueprint: b }: { blueprint: Blueprint }) {
 
       <details className="group border-t border-line pt-4 text-[13px]">
         <summary className="cursor-pointer list-none text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-          <span className="group-open:hidden">Show the data Claude saw ▸</span>
+          <span className="group-open:hidden">Show the data the AI saw ▸</span>
           <span className="hidden group-open:inline">Hide the data ▾</span>
         </summary>
         <div className="mt-3 flex flex-col gap-2 text-soft">
@@ -177,7 +177,7 @@ function LastRun({ run }: { run: BlueprintRun | null }) {
                   {o.reason ?? "No reason recorded. Runs before this feature didn't ask for one; analyze again to get it."}
                 </span>
                 {o.reusedFrom && (
-                  <span className="text-xs text-muted">Unchanged since Claude reviewed it {formatDateTime(o.reusedFrom)}, so not re-checked.</span>
+                  <span className="text-xs text-muted">Unchanged since it was reviewed {formatDateTime(o.reusedFrom)}, so not re-checked.</span>
                 )}
               </li>
             ))}
@@ -205,10 +205,10 @@ export default async function BlueprintsPage({ searchParams }: PageProps<"/bluep
   return (
     <>
       <header className="flex flex-col gap-3.5">
-        <span className="eyebrow">AI review · Claude</span>
+        <span className="eyebrow">AI review · Gemini</span>
         <h1 className="text-[32px] leading-[1.06] font-medium tracking-[-0.01em] sm:text-[44px]">Blueprints</h1>
         <p className="max-w-2xl text-[15px] leading-relaxed text-muted">
-          For each page people are finding, Claude compares its title and meta description with the searches it shows up
+          For each page people are finding, Gemini compares its title and meta description with the searches it shows up
           for and proposes the single change most likely to win clicks. Pages with nothing worth changing get no
           blueprint. Mark a blueprint done once the change is live on the site; its before and after numbers appear
           under Results.

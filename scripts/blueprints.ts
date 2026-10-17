@@ -1,4 +1,4 @@
-// Ask Claude for one high-leverage title/meta change per page and store it as a blueprint.
+// Ask Gemini for one high-leverage title/meta change per page and store it as a blueprint.
 //
 //   npm run blueprints                                   # every site, pages with > 20 impressions
 //   npm run blueprints -- --min-impressions=10 --max-pages=5

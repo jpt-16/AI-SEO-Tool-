@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import Anthropic from "@anthropic-ai/sdk";
 import {
   BlueprintOutput,
   buildUserPrompt,
-  describeAnthropicError,
   noPagesReason,
   selectPages,
   snapshotSignature,
@@ -132,41 +130,11 @@ describe("selectPages", () => {
   });
 });
 
-describe("describeAnthropicError", () => {
-  it("surfaces the API's own message, e.g. an empty credit balance", () => {
-    const err = Anthropic.APIError.generate(
-      400,
-      {
-        type: "error",
-        error: {
-          type: "invalid_request_error",
-          message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
-        },
-      },
-      undefined,
-      new Headers(),
-    );
-    expect(describeAnthropicError(err)).toBe(
-      "Anthropic API error 400: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
-    );
-  });
-
-  it("names a rejected key", () => {
-    const err = Anthropic.APIError.generate(
-      401,
-      { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } },
-      undefined,
-      new Headers(),
-    );
-    expect(describeAnthropicError(err)).toMatch(/API key was rejected/);
-  });
-});
-
 describe("usageCost", () => {
   it("prices input and output tokens per million", () => {
-    expect(usageCost(1_000_000, 0).costUsd).toBe(3);
-    expect(usageCost(0, 1_000_000).costUsd).toBe(15);
-    expect(usageCost(4000, 2000)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.042 });
+    expect(usageCost(1_000_000, 0).costUsd).toBe(0.3);
+    expect(usageCost(0, 1_000_000).costUsd).toBe(2.5);
+    expect(usageCost(4000, 2000)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.0062 });
   });
 });
 

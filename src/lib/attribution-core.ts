@@ -87,7 +87,7 @@ export function computeDiff(before: StatsSnapshot, after: StatsSnapshot): Result
   };
 }
 
-// The queries a blueprint is measured on: the ones Claude cited, if they're in
+// The queries a blueprint is measured on: the ones the model cited, if they're in
 // the data it saw, otherwise every query it saw.
 export function pickTargetQueries(cited: string[] | null | undefined, seen: string[]): string[] {
   const byLower = new Map(seen.map((q) => [q.toLowerCase(), q]));

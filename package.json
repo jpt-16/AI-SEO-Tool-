@@ -14,7 +14,6 @@
     "visual-check": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/visual-check.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
     "@sparticuz/chromium": "^153.0.0",
     "@supabase/supabase-js": "^2.117.0",
     "cheerio": "^1.2.0",

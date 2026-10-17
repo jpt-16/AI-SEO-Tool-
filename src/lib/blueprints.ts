@@ -1,11 +1,8 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
   BLUEPRINT_MODEL,
   BlueprintOutput,
   buildUserPrompt,
-  describeAnthropicError,
   noPagesReason,
   selectPages,
   snapshotSignature,
@@ -18,6 +15,8 @@ import {
   type Usage,
   type PageSnapshot,
 } from "./blueprint-prompt";
+import { createGeminiClient, describeAiError, GeminiError, type GeminiClient } from "./gemini";
+import { THINKING_BUDGET } from "./effort";
 import { pickTargetQueries, sortResults, type ResultDiff, type StatsSnapshot } from "./attribution-core";
 import { runSiteCrawl } from "./crawl-run";
 import { getOverview, getPageReport } from "./reports";
@@ -32,12 +31,12 @@ export interface BlueprintRunOptions {
   minImpressions?: number;
   maxPages?: number;
   dryRun?: boolean;
-  // How much Claude reasons per page (most of the cost). Defaults to DEFAULT_EFFORT.
+  // How much the model reasons per page (most of the cost). Defaults to DEFAULT_EFFORT.
   effort?: Effort;
-  // Re-review pages Claude cleared recently even if nothing about them changed.
+  // Re-review pages the model cleared recently even if nothing about them changed.
   recheck?: boolean;
-  // Injected in tests; defaults to a client reading ANTHROPIC_API_KEY.
-  client?: Pick<Anthropic, "messages">;
+  // Injected in tests; defaults to a client reading GEMINI_API_KEY.
+  client?: GeminiClient;
 }
 
 // A "nothing to change" verdict is reused for this long if the page hasn't changed.
@@ -47,9 +46,9 @@ export interface PageOutcome {
   page_key: string;
   url: string;
   outcome: "blueprint" | "none" | "error" | "skipped";
-  // Claude's reason when the outcome is "none".
+  // The model's reason when the outcome is "none".
   reason?: string;
-  // snapshotSignature() of what Claude saw, so an unchanged page can reuse this verdict.
+  // snapshotSignature() of what the model saw, so an unchanged page can reuse this verdict.
   signature?: string;
   // Set when this "none" was carried over from an earlier review instead of a new call.
   reusedFrom?: string;
@@ -73,23 +72,20 @@ export interface BlueprintRunResult {
 }
 
 export async function analyzePage(
-  client: Pick<Anthropic, "messages">,
+  client: GeminiClient,
   business: { name: string; domain: string },
   snapshot: PageSnapshot,
   effort: Effort = DEFAULT_EFFORT,
 ): Promise<{ answer: BlueprintAnswer; usage: Usage }> {
-  const response = await client.messages.parse({
+  const { parsed, inputTokens, outputTokens } = await client.generateJson({
     model: BLUEPRINT_MODEL,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
     system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildUserPrompt(business, snapshot) }],
-    output_config: { format: zodOutputFormat(BlueprintOutput), effort },
+    prompt: buildUserPrompt(business, snapshot),
+    schema: BlueprintOutput,
+    thinkingBudget: THINKING_BUDGET[effort],
+    maxOutputTokens: 16000,
   });
-  if (response.stop_reason === "refusal") throw new Error("Claude declined to analyze this page.");
-  if (response.stop_reason === "max_tokens") throw new Error("Claude's answer was cut off (max_tokens).");
-  if (!response.parsed_output) throw new Error("Claude's answer didn't match the blueprint format.");
-  return { answer: response.parsed_output, usage: usageCost(response.usage.input_tokens, response.usage.output_tokens) };
+  return { answer: parsed, usage: usageCost(inputTokens, outputTokens) };
 }
 
 async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -106,7 +102,7 @@ async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => P
 }
 
 // The latest "nothing to change" verdict per page from the last REUSE_DAYS, with the
-// signature of what Claude saw then.
+// signature of what the model saw then.
 async function recentVerdicts(siteId: string): Promise<Map<string, PageOutcome & { at: string }>> {
   const since = new Date(Date.now() - REUSE_DAYS * 86_400_000).toISOString();
   const { data, error } = await db()
@@ -201,10 +197,9 @@ export async function runBlueprints(
   if (runError) throw runError;
 
   try {
-    if (pages.length && !options.client && !process.env.ANTHROPIC_API_KEY) {
-      throw new Error("ANTHROPIC_API_KEY isn't set.");
-    }
-    const client = options.client ?? new Anthropic();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (pages.length && !options.client && !apiKey) throw new Error("GEMINI_API_KEY isn't set.");
+    const client = options.client ?? createGeminiClient(apiKey ?? "");
 
     const { data: crawlRows, error: crawlError } = await db()
       .from("crawl_pages")
@@ -257,8 +252,8 @@ export async function runBlueprints(
         if (error) throw new Error(`Saving blueprint failed: ${error.message}`);
         return { ...base, usage, outcome: "blueprint" };
       } catch (err) {
-        if (err instanceof Anthropic.AuthenticationError) throw err;
-        return { ...base, outcome: "error", error: describeAnthropicError(err) };
+        if (err instanceof GeminiError && err.kind === "auth") throw err;
+        return { ...base, outcome: "error", error: describeAiError(err) };
       }
     });
 
@@ -271,7 +266,7 @@ export async function runBlueprints(
     result.ok = failed.length < outcomes.length || outcomes.length === 0;
     if (!result.ok) result.error = failed[0]?.error;
   } catch (err) {
-    result.error = describeAnthropicError(err);
+    result.error = describeAiError(err);
   }
 
   await db()

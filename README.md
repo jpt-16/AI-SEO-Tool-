@@ -59,7 +59,8 @@ Copy `.env.example` to `.env.local` and fill it in:
 | `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Your login for the app |
 | `CRON_SECRET` | `openssl rand -hex 32` |
-| `ANTHROPIC_API_KEY` | From console.anthropic.com → API Keys (Blueprints feature) |
+| `GEMINI_API_KEY` | From aistudio.google.com → Get API key (Blueprints feature). Use a billing-enabled project: free-tier prompts can be used to improve Google's products |
+| `GEMINI_MODEL` (optional) | Defaults to `gemini-2.5-flash`. If you change it, also set `GEMINI_INPUT_USD_PER_MTOK` and `GEMINI_OUTPUT_USD_PER_MTOK` so the cost shown is right |
 
 ### 4. Run it
 
@@ -211,11 +212,12 @@ Both show under **Resolved**. Issues are recomputed on every view, so nothing go
 
 ## Blueprints (AI review)
 
-`src/lib/blueprints.ts` asks Claude (`claude-sonnet-4-6`, via the Messages API with adaptive thinking)
-to review each page people are finding. For every page with more than 20 impressions in the last 90
+`src/lib/blueprints.ts` asks Gemini (`gemini-2.5-flash`, via the Gemini API `generateContent` endpoint, see
+`src/lib/gemini.ts`) to review each page people are finding. For every page with more than 20 impressions in the last 90
 days (adjustable) that the crawler has seen, it sends the page's title, meta description, H1/H2s, word
-count, schema types and its top 5 queries (impressions, clicks, CTR, position). Claude returns
-structured JSON, enforced with a Zod schema through `messages.parse()`:
+count, schema types and its top 5 queries (impressions, clicks, CTR, position). Gemini returns
+structured JSON, constrained by the Zod schema as a JSON Schema (`responseJsonSchema`) and validated again
+on receipt:
 
 ```json
 { "blueprint": { "finding": "…", "reasoning": "…", "proposed_title": "…" | null,
@@ -224,14 +226,14 @@ structured JSON, enforced with a Zod schema through `messages.parse()`:
   "no_change_reason": "…" | null }
 ```
 
-`blueprint: null` means there's nothing worth changing. The prompt tells Claude that's a good outcome,
-so it doesn't manufacture recommendations. Claude then gives a one-sentence `no_change_reason`, stored in
+`blueprint: null` means there's nothing worth changing. The prompt tells the model that's a good outcome,
+so it doesn't manufacture recommendations. The model then gives a one-sentence `no_change_reason`, stored in
 the run's `results` and listed under the last run on the Blueprints page. `target_queries` are the queries
-the change is aimed at; any Claude cites that aren't in the data it saw are dropped. Each finding becomes a row in `blueprints` (`status` open /
-done / skipped, `created_at`, `status_changed_at`, plus a `page_snapshot` of exactly what Claude saw).
+the change is aimed at; any the model cites that aren't in the data it saw are dropped. Each finding becomes a row in `blueprints` (`status` open /
+done / skipped, `created_at`, `status_changed_at`, plus a `page_snapshot` of exactly what the model saw).
 A page with an open blueprint is skipped on later runs, and every run is logged in `blueprint_runs`.
 
-Needs `ANTHROPIC_API_KEY`. Run it from the **Blueprints** page (**Analyze pages**, up to 10 pages per
+Needs `GEMINI_API_KEY`. Run it from the **Blueprints** page (**Analyze pages**, up to 10 pages per
 click) or with the script:
 
 ```bash
@@ -240,13 +242,13 @@ npm run blueprints -- --min-impressions=10 --max-pages=5
 npm run blueprints -- --effort=low --recheck        # cheapest depth; re-review unchanged pages
 ```
 
-**Cost.** Most of the cost is Claude's thinking, which bills as output tokens ($15/MTok vs $3/MTok
-input). Two things keep it down:
+**Cost.** Most of the cost is the model's thinking, which bills as output tokens ($2.50/MTok vs $0.30/MTok
+input for `gemini-2.5-flash`). Two things keep it down:
 
-- **Depth** (`output_config.effort`): Quick = `low`, Standard = `medium` (default), Thorough = `high`.
-- **Reuse**: if Claude said "nothing to change" for a page in the last 30 days and its title, meta, H1s
+- **Depth** (`thinkingBudget`, see `THINKING_BUDGET` in `src/lib/effort.ts`): Quick = 512 tokens, Standard = 2048 (default), Thorough = 8192.
+- **Reuse**: if the model said "nothing to change" for a page in the last 30 days and its title, meta, H1s
   and top queries haven't changed (`snapshotSignature()`), that verdict is reused without a call. Tick
-  **Re-check pages Claude already cleared** (or pass `--recheck`) to review them anyway. Reuse never
+  **Re-check pages already cleared** (or pass `--recheck`) to review them anyway. Reuse never
   extends past 30 days from the original review.
 
 Each run stores `effort`, `pages_reused`, `input_tokens`, `output_tokens` and `cost_usd` in
