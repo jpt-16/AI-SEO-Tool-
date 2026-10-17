@@ -4,7 +4,7 @@ import { BlueprintOutput } from "./blueprint-prompt";
 import { createGeminiClient, describeAiError, GeminiError } from "./gemini";
 
 const Schema = z.object({ answer: z.string().nullable() });
-const request = { model: "gemini-3.5-flash", system: "sys", prompt: "hi", schema: Schema, thinkingLevel: "low" as const, maxOutputTokens: 1000 };
+const request = { model: "gemini-3.8-flash", system: "sys", prompt: "hi", schema: Schema, thinkingLevel: "low" as const, maxOutputTokens: 1000 };
 
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const answer = (text: string, usage = { promptTokenCount: 100, candidatesTokenCount: 20, thoughtsTokenCount: 300 }, finishReason = "STOP") =>
@@ -25,7 +25,7 @@ describe("createGeminiClient", () => {
     const result = await client.generateJson(request);
     expect(result).toEqual({ parsed: { answer: "ok" }, inputTokens: 100, outputTokens: 320 });
 
-    expect(calls[0].url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent");
+    expect(calls[0].url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent");
     expect(calls[0].url).not.toContain("test-key");
     expect((calls[0].init.headers as Record<string, string>)["x-goog-api-key"]).toBe("test-key");
     const body = JSON.parse(calls[0].init.body as string);

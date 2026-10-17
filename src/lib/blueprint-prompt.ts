@@ -2,13 +2,18 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { PageRow } from "./reports";
 
-// Override with GEMINI_MODEL (and the two prices, if the model isn't gemini-3.5-flash).
-export const BLUEPRINT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
-// USD per million tokens for BLUEPRINT_MODEL. Thinking tokens bill as output.
-export const BLUEPRINT_PRICING = {
-  input: Number(process.env.GEMINI_INPUT_USD_PER_MTOK) || 1.5,
-  output: Number(process.env.GEMINI_OUTPUT_USD_PER_MTOK) || 9,
-};
+// Override with GEMINI_MODEL (and the two prices, if the model isn't gemini-3.8-flash).
+export const BLUEPRINT_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+// USD per million tokens for BLUEPRINT_MODEL. Thinking tokens bill as output. gemini-3.8-flash
+// has introductory pricing that doubles on 1 Jan 2027.
+const PRICE_RISE = Date.parse("2027-01-01T00:00:00Z");
+export function blueprintPricing(at: number = Date.now()) {
+  const full = at >= PRICE_RISE;
+  return {
+    input: Number(process.env.GEMINI_INPUT_USD_PER_MTOK) || (full ? 1.5 : 0.75),
+    output: Number(process.env.GEMINI_OUTPUT_USD_PER_MTOK) || (full ? 7.5 : 3.75),
+  };
+}
 
 export { DEFAULT_EFFORT, EFFORT_LABELS, EFFORTS, type Effort } from "./effort";
 
@@ -18,8 +23,9 @@ export interface Usage {
   costUsd: number;
 }
 
-export function usageCost(inputTokens: number, outputTokens: number): Usage {
-  const costUsd = (inputTokens * BLUEPRINT_PRICING.input + outputTokens * BLUEPRINT_PRICING.output) / 1_000_000;
+export function usageCost(inputTokens: number, outputTokens: number, at: number = Date.now()): Usage {
+  const price = blueprintPricing(at);
+  const costUsd = (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
   return { inputTokens, outputTokens, costUsd: Math.round(costUsd * 10_000) / 10_000 };
 }
 

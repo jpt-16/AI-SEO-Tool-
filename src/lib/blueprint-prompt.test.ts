@@ -132,9 +132,15 @@ describe("selectPages", () => {
 
 describe("usageCost", () => {
   it("prices input and output tokens per million", () => {
-    expect(usageCost(1_000_000, 0).costUsd).toBe(1.5);
-    expect(usageCost(0, 1_000_000).costUsd).toBe(9);
-    expect(usageCost(4000, 2000)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.024 });
+    const intro = Date.parse("2026-10-17T00:00:00Z");
+    expect(usageCost(1_000_000, 0, intro).costUsd).toBe(0.75);
+    expect(usageCost(0, 1_000_000, intro).costUsd).toBe(3.75);
+    expect(usageCost(4000, 2000, intro)).toEqual({ inputTokens: 4000, outputTokens: 2000, costUsd: 0.0105 });
+  });
+
+  it("uses the full price from 1 January 2027", () => {
+    const full = Date.parse("2027-01-01T00:00:00Z");
+    expect(usageCost(1_000_000, 1_000_000, full).costUsd).toBe(9);
   });
 });
 
