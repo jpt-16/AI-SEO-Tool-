@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useTransition, useState } from "react";
-import { addSearch, createDraftFor, runOutreachNow, type ActionState } from "@/app/(app)/actions";
+import { addSearch, createDraftFor, redraftAll, runOutreachNow, type ActionState } from "@/app/(app)/actions";
 import { MailIcon, RefreshIcon } from "./icons";
 
 const fieldClass =
@@ -59,6 +59,32 @@ export function RunNowButton() {
           {pending ? "Running…" : "Run now"}
         </button>
         {pending && <span className="text-xs text-muted">Finding businesses and drafting emails. This takes a few minutes; keep this page open.</span>}
+      </div>
+      <Status state={state} pending={pending} />
+    </div>
+  );
+}
+
+// For after switching the Gmail account: saves the drafts already made to the new account too.
+export function RedraftAllButton({ count }: { count: number }) {
+  const [state, setState] = useState<ActionState | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn min-h-11"
+          disabled={pending}
+          onClick={() => {
+            setState(null);
+            start(async () => setState(await redraftAll()));
+          }}
+        >
+          <MailIcon size={15} className={pending ? "animate-pulse" : undefined} />
+          {pending ? "Saving…" : `Save the ${count} existing draft${count === 1 ? "" : "s"} to Gmail again`}
+        </button>
+        <span className="text-xs text-muted">Use after changing the Gmail account. The drafts in the old account stay there; delete them yourself.</span>
       </div>
       <Status state={state} pending={pending} />
     </div>

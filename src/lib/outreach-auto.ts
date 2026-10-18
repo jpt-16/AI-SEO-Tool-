@@ -202,6 +202,23 @@ export async function processProspect(id: string, deps: Deps = defaultDeps): Pro
   return { ...drafted, costUsd: research.usage.costUsd };
 }
 
+// Saves every existing draft to Gmail again, for after the Gmail account was changed. The old
+// drafts stay where they were: the tool never deletes mail.
+export async function redraftExisting(deps: Pick<Deps, "createDraft"> = defaultDeps): Promise<{ created: number; failed: number; error?: string }> {
+  const { data, error } = await db().from("outreach_prospects").select("id").eq("draft_state", "created").order("created_at");
+  if (error) throw error;
+  const result: { created: number; failed: number; error?: string } = { created: 0, failed: 0 };
+  for (const { id } of (data ?? []) as { id: string }[]) {
+    const outcome = await draftProspect(id, { deps });
+    if (outcome.state === "created") result.created++;
+    else {
+      result.failed++;
+      result.error = result.error ?? outcome.reason;
+    }
+  }
+  return result;
+}
+
 // ---- The loop ----
 
 export interface LoopOptions {
@@ -253,8 +270,11 @@ export async function runOutreachLoop(options: LoopOptions): Promise<LoopResult>
         .limit(SEARCHES_PER_RUN);
       if (searchError) throw searchError;
       const client = options.client ?? geminiFromEnv();
-      for (const search of (searches ?? []) as OutreachSearch[]) {
-        const need = PER_RUN - ids.length;
+      const list = (searches ?? []) as OutreachSearch[];
+      // Share the open places between the searches, so one trade doesn't take them all.
+      const share = Math.ceil((PER_RUN - ids.length) / Math.max(1, list.length));
+      for (const search of list) {
+        const need = Math.min(share, PER_RUN - ids.length);
         if (need <= 0) break;
         try {
           const found = await discoverForSearch(search, need, client);

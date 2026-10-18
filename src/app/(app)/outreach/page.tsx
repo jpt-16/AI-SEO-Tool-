@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AddSearchForm, RunNowButton } from "@/components/OutreachAuto";
+import { AddSearchForm, RedraftAllButton, RunNowButton } from "@/components/OutreachAuto";
 import { OutreachForm } from "@/components/OutreachForm";
 import { formatDateTime } from "@/lib/format";
 import { gmailStatus } from "@/lib/gmail";
@@ -90,6 +90,7 @@ export default async function OutreachPage() {
         </div>
 
         <RunNowButton />
+        {prospects.some((p) => p.draft_state === "created") && <RedraftAllButton count={prospects.filter((p) => p.draft_state === "created").length} />}
 
         {runs.length > 0 && (
           <div className="flex flex-col gap-2">

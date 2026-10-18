@@ -86,7 +86,7 @@ vi.mock("./supabase", () => ({
   }),
 }));
 
-const { discoverForSearch, draftProspect, processProspect, runOutreachLoop } = await import("./outreach-auto");
+const { discoverForSearch, draftProspect, processProspect, redraftExisting, runOutreachLoop } = await import("./outreach-auto");
 
 const prospect = (over: Row = {}): Row => ({
   id: "p1",
@@ -256,6 +256,27 @@ function discoveryClient(businesses: { name: string; website: string | null; tow
   };
 }
 
+describe("redraftExisting", () => {
+  it("saves each already-drafted prospect to Gmail again and leaves the others alone", async () => {
+    tables.outreach_prospects = [
+      prospect({ id: "a", status: "draft", draft_state: "created", one_pager: sheet, message: "Hi A", email: "a@a.example" }),
+      prospect({ id: "b", status: "passed", draft_state: "no_email" }),
+      prospect({ id: "c", status: "draft", draft_state: "created", one_pager: sheet, message: "Hi C", email: "c@c.example", website: "https://c.example" }),
+    ];
+    const d = deps();
+    const result = await redraftExisting(d.deps);
+    expect(result).toEqual({ created: 2, failed: 0 });
+    expect(d.createDraft).toHaveBeenCalledTimes(2);
+    expect((d.createDraft.mock.calls as unknown as [{ to: string }][]).map((c) => c[0].to)).toEqual(["a@a.example", "c@c.example"]);
+  });
+
+  it("counts failures and keeps the first reason", async () => {
+    tables.outreach_prospects = [prospect({ id: "a", status: "draft", draft_state: "created", one_pager: sheet, message: "Hi", email: "a@a.example" })];
+    const d = deps({ createDraft: vi.fn(async () => { throw new Error("Gmail rejected the address or app password."); }) });
+    expect(await redraftExisting(d.deps)).toEqual({ created: 0, failed: 1, error: "Gmail rejected the address or app password." });
+  });
+});
+
 describe("discoverForSearch", () => {
   const search = { id: "s1", created_at: "", trade: "plumbers", town: "Foxboro, MA", enabled: true, last_run_at: null };
 
@@ -344,6 +365,17 @@ describe("runOutreachLoop", () => {
     });
     const result = await runOutreachLoop({ trigger: "cron", runOne, client: discoveryClient([]) });
     expect(result).toMatchObject({ ok: true, drafted: 1, failed: 1, error: "HTTP 504" });
+  });
+
+  it("shares the open places between the saved searches", async () => {
+    tables.outreach_prospects = [];
+    tables.outreach_searches = ["plumbers", "roofers", "landscapers"].map((trade, i) => ({ id: `s${i}`, created_at: "", trade, town: "Foxboro, MA", enabled: true, last_run_at: null }));
+    const client = discoveryClient([]);
+    await runOutreachLoop({ trigger: "cron", runOne: async () => ok, client });
+    const asked = (client.search as ReturnType<typeof vi.fn>).mock.calls.map((c) => (c[0] as { prompt: string }).prompt);
+    // 6 places across 3 searches: 2 each (and a few extra requested to allow for rejects).
+    expect(asked).toHaveLength(3);
+    for (const prompt of asked) expect(prompt).toContain("Find up to 6 independent");
   });
 
   it("keeps going when one saved search fails", async () => {

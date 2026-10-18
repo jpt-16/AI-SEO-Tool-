@@ -13,7 +13,7 @@ import { requireEnv } from "@/lib/env";
 import { isPublicHostname, normalizeWebsite } from "@/lib/outreach-core";
 import { OnePagerSheet } from "@/lib/outreach-sheet";
 import { PROSPECT_STATUSES, researchProspect } from "@/lib/outreach";
-import { draftProspect, remoteRunner, runOutreachLoop } from "@/lib/outreach-auto";
+import { draftProspect, redraftExisting, remoteRunner, runOutreachLoop } from "@/lib/outreach-auto";
 import { describeGoogleError, getConnection, gscRequester, oauthClient } from "@/lib/google";
 import { listSites as listGscProperties } from "@/lib/gsc";
 import { SITE_COOKIE } from "@/lib/sites";
@@ -296,4 +296,12 @@ export async function createDraftFor(_prev: ActionState | null, formData: FormDa
   revalidatePath("/outreach");
   if (outcome.state === "created") return { ok: true, message: "Draft created in Gmail." };
   return { ok: false, message: outcome.reason ?? "Couldn't create the draft." };
+}
+
+// Saves the existing drafts to Gmail again (after switching the Gmail account).
+export async function redraftAll(): Promise<ActionState> {
+  const result = await redraftExisting();
+  revalidatePath("/outreach");
+  if (result.failed) return { ok: false, message: `${result.created} saved, ${result.failed} failed. ${result.error ?? ""}`.trim() };
+  return { ok: true, message: `${result.created} draft${result.created === 1 ? "" : "s"} saved to Gmail again.` };
 }
