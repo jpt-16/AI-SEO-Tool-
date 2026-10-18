@@ -12,12 +12,7 @@ vi.mock("./google", () => ({
 
 const { createGmailDraft } = await import("./gmail");
 
-const input = {
-  to: "info@smith.example",
-  subject: "Hello",
-  text: "Hi",
-  attachment: { filename: "a.pdf", data: Buffer.from("pdf"), contentType: "application/pdf" },
-};
+const input = { to: "info@smith.example", subject: "Hello", text: "Hi" };
 
 describe("createGmailDraft", () => {
   it("posts one raw message to the drafts endpoint and returns the draft id", async () => {

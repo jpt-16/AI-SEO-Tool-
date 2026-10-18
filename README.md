@@ -256,8 +256,9 @@ Each run stores `effort`, `pages_reused`, `input_tokens`, `output_tokens` and `c
 
 ## Outreach (cold-outreach one-pager)
 
-**Outreach** fills in the "A quick look, made for you" one-pager for a business you haven't spoken to, and
-writes the short message to send with it. Nothing is sent for you.
+**Outreach** writes a personal cold email for a business you haven't spoken to, following the four-part
+structure of your "A quick look, made for you" one-pager (research, their problem, your solution, free
+value). Nothing is sent for you.
 
 Enter the business name and website (town, owner and "what you already know" are optional but make it
 better). `src/lib/outreach.ts` then:
@@ -275,8 +276,8 @@ better). `src/lib/outreach.ts` then:
 
 The prompt tells the model to use only what it was given, say "I couldn't find…" instead of guessing, hedge
 ("may"), and treat your notes as true. Steps 1 to 3 are best effort: if one fails the draft still happens and
-the failure is shown on the prospect's page. The sheet is editable on screen; **Print / save as PDF** prints
-exactly one US Letter page (print CSS in `globals.css`), and **Copy as text** gives a plain-text version.
+the failure is shown on the prospect's page. The email is editable on screen (each of the four parts, the
+opening and the subject) with a live preview of exactly what goes into Gmail; **Copy email** copies it.
 Prospects are stored in `outreach_prospects` with a status (draft, sent, replied, passed). The fixed text
 (price line, phone, sender) is in `OUTREACH` in `src/lib/outreach-sheet.ts`.
 
@@ -294,9 +295,11 @@ Set up once under **Outreach → Automatic outreach**, then it runs by itself:
 - Up to **`OUTREACH_PER_RUN`** (default 6, max 12) businesses per run. Each is handled in its **own function
   call** (`?prospectId=`, up to 5 minutes each), like the weekly crawl does per site.
 - Per business, cheapest checks first: read their site; skip it if it doesn't look like that business or has
-  **no email address** (`pickEmail()` prefers a general inbox on their own domain); only then research, draft and
-  render the sheet to a one-page **PDF** (headless Chromium, `src/lib/outreach-html.ts`), and create the **Gmail
-  draft** (message in the body, PDF attached) via `users.drafts.create`.
+  **no email address** (`pickEmail()` prefers a general inbox on their own domain); only then research and draft the
+  email, and create the **Gmail draft** via `users.drafts.create`. The email is plain text: a short personal
+  opening, then the one-pager's four parts (what I found, what it may mean for your customers, how I can help
+  with the price line, what's free), a signature and an opt-out line (`composeEmail()` in
+  `src/lib/outreach-sheet.ts`). No attachment.
 - Each run is logged (found / drafted / no email / skipped / failed / cost) on the Outreach page. **Run now**
   does the same by hand. A business whose research fails is retried once the next day, then dropped.
 - The email body ends with your signature and a "reply no thanks" opt-out line. Set **`OUTREACH_POSTAL_ADDRESS`**

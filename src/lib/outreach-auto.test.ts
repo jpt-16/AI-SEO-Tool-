@@ -3,7 +3,6 @@ import type { GeminiClient } from "./gemini";
 
 vi.mock("server-only", () => ({}));
 vi.mock("./visual", () => ({ captureSite: vi.fn(), launchBrowser: vi.fn() }));
-vi.mock("./outreach-pdf", () => ({ renderSheetPdf: vi.fn() }));
 
 let gmail: { connected: boolean; allowed: boolean; email: string | null } = { connected: true, allowed: true, email: "jake@jtbuildsco.com" };
 vi.mock("./gmail", () => ({ gmailStatus: async () => gmail, createGmailDraft: vi.fn() }));
@@ -145,7 +144,6 @@ function deps(over: Record<string, unknown> = {}) {
     deps: {
       readSite: vi.fn(async () => facts()),
       research: research(),
-      renderPdf: vi.fn(async () => Buffer.from("%PDF")),
       createDraft,
       ...over,
     } as never,
@@ -163,16 +161,17 @@ beforeEach(() => {
 });
 
 describe("processProspect", () => {
-  it("researches, drafts and puts the email in Gmail with the PDF attached", async () => {
+  it("researches, drafts and puts the email in Gmail", async () => {
     const d = deps();
     const outcome = await processProspect("p1", d.deps);
     expect(outcome.state).toBe("created");
     expect(d.createDraft).toHaveBeenCalledTimes(1);
-    const sent = (d.createDraft.mock.calls[0] as unknown as [{ to: string; subject: string; text: string; attachment: { filename: string; contentType: string } }])[0];
+    const sent = (d.createDraft.mock.calls[0] as unknown as [{ to: string; subject: string; text: string }])[0];
     expect(sent).toMatchObject({ to: "info@smithplumbing.com", subject: "A quick look at Smith" });
-    expect(sent.text).toContain("Hi Pat. Jake");
-    expect(sent.text).toContain('reply "no thanks"');
-    expect(sent.attachment).toMatchObject({ filename: "A quick look at Smith & Sons Plumbing.pdf", contentType: "application/pdf" });
+    // The opening, then the one-pager's four parts.
+    expect(sent.text.startsWith("Hi Pat. Jake")).toBe(true);
+    for (const part of ["- Google listing: g", "What this may mean for your customers", "How I can help", "Free, no strings", 'reply "no thanks"']) expect(sent.text).toContain(part);
+    expect(Object.keys(sent)).toEqual(["to", "subject", "text"]);
     expect(row("p1")).toMatchObject({ status: "draft", draft_state: "created", gmail_draft_id: "draft-1", email: "info@smithplumbing.com", draft_error: null });
     expect(outcome.costUsd).toBe(0.05);
   });

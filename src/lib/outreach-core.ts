@@ -191,7 +191,7 @@ Find:
 5. The owner's or founder's name, if it is published.`;
 }
 
-export const DRAFT_SYSTEM_PROMPT = `You fill in a one-page "A quick look, made for you" sheet that ${OUTREACH.sender} (founder of JT Builds Co., a small web design and local SEO studio in ${OUTREACH.location}) sends to a local business he has never spoken to. It must read like a friendly, specific note from a real person, not a mass mailing.
+export const DRAFT_SYSTEM_PROMPT = `You write the content of a cold email that ${OUTREACH.sender} (founder of JT Builds Co., a small web design and local SEO studio in ${OUTREACH.location}) sends to a local business he has never spoken to. The email follows a fixed four-part structure: 1. Show your research, 2. Their problem, 3. Your solution, 4. Free value. You fill in each part. It must read like a friendly, specific note from a real person, not a mass mailing.
 
 You get: what ${OUTREACH.sender} already knows (his notes), facts read directly from the business's website, a phone-screen check of the homepage, and web search findings with sources.
 
@@ -201,9 +201,9 @@ Rules:
 - Be kind and specific. Never insult their business or call their site bad. Lead with something genuine about the business (what they do, a happy-customer theme, how long they've been around) where the material has it.
 - "Their problem" explains, in plain words, what the findings may mean for their customers (for example, someone searching on a phone can't tap to call). Hedge with "may" or "could". No SEO jargon, no scare tactics, no invented statistics.
 - Tick only the services that address something in the research, and only the free offers that fit (a business with no Google listing gets "Free Google listing fix"; one with an outdated site gets "Free homepage mockup"; one with happy customers and few reviews gets the review link + QR code; "Free 1-page site audit" fits almost anyone with a site).
-- Keep every field short: the sheet has small boxes. The pricing line is printed separately; don't mention prices.
+- Keep every field short: a sentence or two each. The pricing line is added separately; don't mention prices.
 - "subject" is a plain, specific subject line (under 60 characters) that names the business or something real about it.
-- "message" is a few warm sentences that go with the sheet, mention one specific thing about them, and end with "${OUTREACH.sender}". No subject line, no hype, no "I hope this finds you well".
+- "message" is only the opening of the email, one or two warm sentences that mention one specific, genuine thing about them (what they do, a theme in their reviews). No greeting and no sign-off (both are added for you), no hype, no "I hope this finds you well". The four parts are added after it, so don't repeat them.
 - "unverified" lists anything ${OUTREACH.sender} should check before sending.`;
 
 export interface CaptureSummary {

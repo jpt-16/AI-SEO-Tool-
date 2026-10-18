@@ -63,7 +63,7 @@ export default function PrivacyPolicy() {
         </p>
         <p>
           <strong className="font-medium text-ink">Gmail drafts.</strong> The Gmail permission is used only to save draft
-          outreach emails, each with a PDF one-pager attached, in the connected account&apos;s Drafts folder. {OPERATOR.name}{" "}
+          outreach emails in the connected account&apos;s Drafts folder. {OPERATOR.name}{" "}
           reads each draft and decides whether to send it from Gmail. Google&apos;s <code>gmail.compose</code> permission also
           technically allows sending, but the tool is built never to send email and never does. The drafts are addressed to
           business contact addresses published on those businesses&apos; own websites.

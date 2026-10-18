@@ -10,7 +10,7 @@ import {
   usefulLinks,
   type ResearchBundle,
 } from "./outreach-core";
-import { FREE_VALUE_ITEMS, OnePagerOutput, OnePagerSheet, sheetFromDraft, sheetToText, SOLUTION_ITEMS } from "./outreach-sheet";
+import { composeEmail, FREE_VALUE_ITEMS, OnePagerOutput, OnePagerSheet, sheetFromDraft, SOLUTION_ITEMS } from "./outreach-sheet";
 
 const HOME = `<!doctype html><html><head>
 <title>Smith &amp; Sons Plumbing</title>
@@ -160,13 +160,42 @@ describe("one-pager", () => {
     expect(Object.keys(schema.properties.free_value.properties!)).toEqual(FREE_VALUE_ITEMS.map((i) => i.key));
   });
 
-  it("exports the sheet as plain text with only the ticked options", () => {
-    const text = sheetToText(sheetFromDraft(OnePagerOutput.parse(draft)), "Smith & Sons Plumbing");
-    expect(text).toContain("A quick look, made for Smith & Sons Plumbing");
-    expect(text).toContain("How I can help: Google Business Profile, Local SEO");
-    expect(text).toContain("Free, no strings: Free Google listing fix, Free review link + QR code");
+});
+
+describe("composeEmail", () => {
+  const sheet = sheetFromDraft(OnePagerOutput.parse(draft));
+  const base = { business: "Smith & Sons Plumbing", subject: "A quick look at Smith & Sons", opener: "I liked the reviews about your emergency calls.", sheet };
+
+  it("follows the four parts of the one-pager, in order, with only the ticked options", () => {
+    const { text, subject } = composeEmail(base);
+    expect(subject).toBe("A quick look at Smith & Sons");
+    const order = ["Hi Pat,", "I liked the reviews", "- Google listing:", "- Website & phone:", "- Reviews & local search:", "What this may mean for your customers", "How I can help", "Free, no strings", "Reply to this email"].map((part) => text.indexOf(part));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(text).toContain("Google Business Profile, Local SEO.");
+    expect(text).toContain("Free Google listing fix, Free review link + QR code.");
     expect(text).not.toContain("Custom website");
+    expect(text).toContain("One monthly fee from $97. No setup cost, no contract. Cancel whenever you like.");
     expect(text).toContain("(781) 248-9834");
-    expect(text).toContain("One monthly fee from $97");
+    expect(text).toContain('reply "no thanks"');
+  });
+
+  it("greets by first name, or generically when the owner is unknown", () => {
+    expect(composeEmail(base).text.startsWith("Hi Pat,\n\n")).toBe(true);
+    expect(composeEmail({ ...base, sheet: { ...sheet, owner_name: null } }).text.startsWith("Hi there,\n\n")).toBe(true);
+  });
+
+  it("doesn't add a second greeting to an opener that has one", () => {
+    const { text } = composeEmail({ ...base, opener: "Hi Pat, I took a quick look at your site." });
+    expect(text.match(/\bHi /g)).toHaveLength(1);
+    expect(text.startsWith("Hi Pat, I took")).toBe(true);
+  });
+
+  it("adds the address when given, falls back to a plain subject, and adds the free extra", () => {
+    const { text, subject } = composeEmail({ ...base, subject: "  ", postalAddress: "1 Main St, Foxboro MA", sheet: { ...sheet, free_value_other: "a free logo tweak" } });
+    expect(subject).toBe("A quick look at Smith & Sons Plumbing online");
+    expect(text).toContain("1 Main St, Foxboro MA");
+    expect(text).toContain("a free logo tweak.");
+    expect(composeEmail(base).text).not.toContain("undefined");
   });
 });

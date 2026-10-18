@@ -43,7 +43,7 @@ export const OnePagerOutput = z.object({
   free_value: flags(FREE_VALUE_ITEMS.map((i) => i.key)).describe("Tick the one to three free offers that best fit this business."),
   free_value_other: z.string().nullable().describe("Optional extra free offer, a few words, or null."),
   subject: z.string().describe("Email subject line: specific to this business, under 60 characters, plain, no hype, no clickbait, no ALL CAPS."),
-  message: z.string().describe("The short note sent with the sheet: 3 to 5 sentences, first person as the sender, no subject line, ends with the sender's first name."),
+  message: z.string().describe("The opening of the email, before the four sections: one or two warm sentences, first person as the sender, that mention one specific, genuine thing about this business. No greeting, no sign-off, no subject line, nothing about prices or services."),
   unverified: z.array(z.string()).describe("Things the sender should double-check before sending: anything uncertain, inferred, or from a single weak source. Empty if everything is solid."),
 });
 
@@ -59,14 +59,37 @@ export function formatToday(date: Date = new Date()): string {
   return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
 }
 
-// The sheet as plain text, for pasting into an email or DM.
-export function sheetToText(sheet: OnePagerSheetData, business: string): string {
+const firstName = (full: string | null) => full?.trim().split(/\s+/)[0] || null;
+const GREETING = /^\s*(hi|hello|hey|dear|good (morning|afternoon))\b/i;
+
+export interface Email {
+  subject: string;
+  text: string;
+}
+
+// The email that goes to Gmail: the one-pager's four sections (what we found, what it may mean,
+// how we can help, what's free) written out as plain text, after a short personal opening.
+export function composeEmail(input: {
+  business: string;
+  subject: string | null;
+  opener: string;
+  sheet: OnePagerSheetData;
+  postalAddress?: string | null;
+}): Email {
+  const { sheet } = input;
   const ticked = <T extends { key: string; label: string }>(items: readonly T[], on: Record<string, boolean>) => items.filter((i) => on[i.key]).map((i) => i.label);
-  const free = [...ticked(FREE_VALUE_ITEMS, sheet.free_value), ...(sheet.free_value_other ? [sheet.free_value_other] : [])];
-  return [
-    `A quick look, made for ${business}`,
+  const help = ticked(SOLUTION_ITEMS, sheet.solution);
+  const free = [...ticked(FREE_VALUE_ITEMS, sheet.free_value), ...(sheet.free_value_other?.trim() ? [sheet.free_value_other.trim()] : [])];
+
+  const opener = input.opener.trim();
+  // Messages drafted before the opener existed already start with a greeting.
+  const greeting = GREETING.test(opener) ? [] : [`Hi ${firstName(sheet.owner_name) ?? "there"},`, ""];
+
+  const lines = [
+    ...greeting,
+    ...(opener ? [opener, ""] : []),
+    `Here's what I found when I looked at ${input.business} online:`,
     "",
-    "What I found",
     `- Google listing: ${sheet.google_listing}`,
     `- Website & phone: ${sheet.website_and_phone}`,
     `- Reviews & local search: ${sheet.reviews_and_local_search}`,
@@ -74,12 +97,23 @@ export function sheetToText(sheet: OnePagerSheetData, business: string): string 
     "What this may mean for your customers",
     sheet.problem,
     "",
-    `How I can help: ${ticked(SOLUTION_ITEMS, sheet.solution).join(", ")}`,
+    "How I can help",
+    ...(help.length ? [`${help.join(", ")}.`] : []),
     sheet.solution_note,
     OUTREACH.price,
     "",
-    `Free, no strings: ${free.join(", ")}`,
-    `Reply to this message or call ${OUTREACH.phone}, or visit ${OUTREACH.contactUrl}.`,
-    `${OUTREACH.sender}, ${OUTREACH.role}`,
-  ].join("\n");
+    "Free, no strings",
+    ...(free.length ? [`${free.join(", ")}.`] : []),
+    "",
+    `Reply to this email, call ${OUTREACH.phone}, or visit ${OUTREACH.contactUrl}. I reply personally within one business day.`,
+    "",
+    OUTREACH.sender,
+    `${OUTREACH.role} · ${OUTREACH.location}`,
+    OUTREACH.site,
+    "",
+    `Not interested? Just reply "no thanks" and I won't email you again.`,
+    ...(input.postalAddress ? [input.postalAddress] : []),
+  ];
+  const subject = (input.subject ?? "").replace(/[\r\n]+/g, " ").trim() || `A quick look at ${input.business} online`;
+  return { subject: subject.slice(0, 120), text: `${lines.join("\n")}\n` };
 }

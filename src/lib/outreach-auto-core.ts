@@ -3,7 +3,6 @@
 import { z } from "zod";
 import { hostKey } from "./crawl";
 import { isPublicHostname, normalizeWebsite, type PageFacts } from "./outreach-core";
-import { OUTREACH } from "./outreach-sheet";
 
 // ---- Finding businesses ----
 
@@ -123,63 +122,22 @@ export function pickEmail(emails: string[], website: string): string | null {
 
 // ---- The email ----
 
-export interface EmailParts {
-  subject: string;
-  text: string;
-  attachmentName: string;
-}
-
-const safeFilename = (s: string) => s.replace(/[^\w &.-]+/g, "").replace(/\s+/g, " ").trim().slice(0, 60) || "Business";
-
-export function buildEmail(input: { businessName: string; subject: string | null; message: string; postalAddress?: string | null }): EmailParts {
-  const footer = [
-    "--",
-    `${OUTREACH.sender} · ${OUTREACH.role} · ${OUTREACH.location}`,
-    `${OUTREACH.phone} · ${OUTREACH.site}`,
-    "",
-    `Not interested? Just reply "no thanks" and I won't email you again.`,
-    ...(input.postalAddress ? [input.postalAddress] : []),
-  ];
-  const subject = (input.subject ?? "").replace(/[\r\n]+/g, " ").trim() || `A quick look at ${input.businessName} online`;
-  return {
-    subject: subject.slice(0, 120),
-    text: `${input.message.trim()}\n\n${footer.join("\n")}\n`,
-    attachmentName: `A quick look at ${safeFilename(input.businessName)}.pdf`,
-  };
-}
-
-const wrap76 = (b64: string) => b64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
-
 // RFC 2047 so a subject with accents or dashes survives.
 const encodeHeader = (value: string) => (/^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`);
 
-const MIME_HEADER_INJECTION = /[\r\n]/;
+const wrap76 = (b64: string) => b64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
 
-// A multipart email (text + PDF) as the raw message Gmail's drafts API takes (base64url).
-export function buildRawEmail(input: { to: string; subject: string; text: string; attachment: { filename: string; data: Buffer; contentType: string }; boundary?: string }): string {
-  if (MIME_HEADER_INJECTION.test(input.to) || MIME_HEADER_INJECTION.test(input.subject) || MIME_HEADER_INJECTION.test(input.attachment.filename)) {
-    throw new Error("Email headers can't contain line breaks.");
-  }
-  const boundary = input.boundary ?? `jtb-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-  const filename = encodeHeader(input.attachment.filename);
+// A plain-text email as the raw message Gmail's drafts API takes (base64url).
+export function buildRawEmail(input: { to: string; subject: string; text: string }): string {
+  if (/[\r\n]/.test(input.to) || /[\r\n]/.test(input.subject)) throw new Error("Email headers can't contain line breaks.");
   const lines = [
     `To: ${input.to}`,
     `Subject: ${encodeHeader(input.subject)}`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
     "Content-Type: text/plain; charset=UTF-8",
     "Content-Transfer-Encoding: base64",
     "",
     wrap76(Buffer.from(input.text, "utf8").toString("base64")),
-    `--${boundary}`,
-    `Content-Type: ${input.attachment.contentType}; name="${filename}"`,
-    `Content-Disposition: attachment; filename="${filename}"`,
-    "Content-Transfer-Encoding: base64",
-    "",
-    wrap76(input.attachment.data.toString("base64")),
-    `--${boundary}--`,
     "",
   ];
   return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");

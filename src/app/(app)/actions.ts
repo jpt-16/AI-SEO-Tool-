@@ -212,12 +212,12 @@ export async function researchAgain(_prev: ActionState | null, formData: FormDat
   return { ok: true, message: `Redrafted · cost $${result.usage.costUsd.toFixed(3)} (not counting Google Search fees).` };
 }
 
-export async function saveSheet(id: string, sheet: unknown, message: string): Promise<ActionState> {
+export async function saveSheet(id: string, sheet: unknown, message: string, subject: string): Promise<ActionState> {
   const parsed = OnePagerSheet.safeParse(sheet);
   if (!parsed.success) return { ok: false, message: "The sheet has a missing field." };
   const { error } = await db()
     .from("outreach_prospects")
-    .update({ one_pager: parsed.data, message, updated_at: new Date().toISOString() })
+    .update({ one_pager: parsed.data, message, subject: subject.trim() || null, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
   revalidatePath(`/outreach/${id}`);

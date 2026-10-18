@@ -79,7 +79,7 @@ export function DraftToGmailForm({ id, defaultTo, created }: { id: string; defau
           <MailIcon size={15} className={pending ? "animate-pulse" : undefined} />
           {pending ? "Creating…" : created ? "Create another Gmail draft" : "Create Gmail draft"}
         </button>
-        <span className="text-xs text-muted">Saved as a draft with the one-pager attached as a PDF. Nothing is sent.</span>
+        <span className="text-xs text-muted">Saved as a draft in Gmail. Nothing is sent.</span>
         <Status state={state} pending={pending} />
       </div>
     </form>

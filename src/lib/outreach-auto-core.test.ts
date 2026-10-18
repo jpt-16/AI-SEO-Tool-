@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   blockedHost,
-  buildEmail,
   buildRawEmail,
   pickEmail,
   siteMatchesBusiness,
   toCandidates,
 } from "./outreach-auto-core";
-import { sheetHtml } from "./outreach-html";
 
 describe("toCandidates", () => {
   it("accepts real business sites and remembers them", () => {
@@ -86,89 +84,32 @@ describe("pickEmail", () => {
   });
 });
 
-describe("buildEmail", () => {
-  it("adds the signature and an opt-out line to the message", () => {
-    const email = buildEmail({ businessName: "Smith & Sons", subject: "  A quick look\nat Smith  ", message: "Hi Pat.\n\nJake", postalAddress: "1 Main St, Foxboro MA" });
-    expect(email.subject).toBe("A quick look at Smith");
-    expect(email.text).toContain("Hi Pat.\n\nJake\n\n--\nJake · Founder, JT Builds Co.");
-    expect(email.text).toContain('reply "no thanks"');
-    expect(email.text).toContain("1 Main St, Foxboro MA");
-    expect(email.attachmentName).toBe("A quick look at Smith & Sons.pdf");
-  });
-
-  it("falls back to a plain subject and omits the address when there isn't one", () => {
-    const email = buildEmail({ businessName: "Doe/Co <x>", subject: null, message: "Hi" });
-    expect(email.subject).toBe("A quick look at Doe/Co <x> online");
-    expect(email.attachmentName).toBe("A quick look at DoeCo x.pdf");
-    expect(email.text).not.toContain("undefined");
-  });
-});
-
 describe("buildRawEmail", () => {
   const decode = (raw: string) => Buffer.from(raw, "base64url").toString("utf8");
-  const pdf = Buffer.from("%PDF-1.4 fake pdf bytes");
-  const raw = buildRawEmail({
-    to: "info@smithplumbing.com",
-    subject: "A quick look at Smith – plumbing",
-    text: "Hi Pat — thanks.\nJake",
-    attachment: { filename: "A quick look at Smith.pdf", data: pdf, contentType: "application/pdf" },
-    boundary: "BOUNDARY",
-  });
+  const raw = buildRawEmail({ to: "info@smithplumbing.com", subject: "A quick look at Smith – plumbing", text: "Hi Pat — thanks.\nJake" });
   const mime = decode(raw);
 
-  it("is a multipart message with the right headers", () => {
+  it("is a plain-text message with the right headers and no attachment", () => {
     expect(mime).toContain("To: info@smithplumbing.com\r\n");
     expect(mime).toContain("MIME-Version: 1.0");
-    expect(mime).toContain('Content-Type: multipart/mixed; boundary="BOUNDARY"');
-    expect(mime.endsWith("--BOUNDARY--\r\n")).toBe(true);
+    expect(mime).toContain("Content-Type: text/plain; charset=UTF-8");
+    expect(mime).not.toMatch(/multipart|attachment|application\/pdf/i);
     expect(mime).not.toMatch(/^From:/m);
   });
 
   it("encodes a non-ASCII subject and body so they survive", () => {
     const subject = mime.match(/^Subject: =\?UTF-8\?B\?(.+)\?=$/m)![1];
     expect(Buffer.from(subject, "base64").toString("utf8")).toBe("A quick look at Smith – plumbing");
-    const body = mime.split("--BOUNDARY")[1].split("\r\n\r\n")[1].replace(/\r\n/g, "");
+    const body = mime.split("\r\n\r\n")[1].replace(/\r\n/g, "");
     expect(Buffer.from(body, "base64").toString("utf8")).toBe("Hi Pat — thanks.\nJake");
   });
 
-  it("attaches the PDF intact", () => {
-    const part = mime.split("--BOUNDARY")[2];
-    expect(part).toContain("Content-Type: application/pdf");
-    expect(part).toContain('Content-Disposition: attachment; filename="A quick look at Smith.pdf"');
-    const data = part.split("\r\n\r\n")[1].replace(/\r\n/g, "");
-    expect(Buffer.from(data, "base64").equals(pdf)).toBe(true);
+  it("keeps an ASCII subject readable", () => {
+    expect(decode(buildRawEmail({ to: "a@b.example", subject: "Hello there", text: "x" }))).toContain("Subject: Hello there\r\n");
   });
 
   it("refuses line breaks in headers", () => {
-    const attachment = { filename: "a.pdf", data: pdf, contentType: "application/pdf" };
-    expect(() => buildRawEmail({ to: "a@b.example\r\nBcc: x@y.example", subject: "s", text: "t", attachment })).toThrow(/line breaks/);
-    expect(() => buildRawEmail({ to: "a@b.example", subject: "s\nBcc: x@y.example", text: "t", attachment })).toThrow(/line breaks/);
-  });
-});
-
-describe("sheetHtml", () => {
-  const sheet = {
-    owner_name: null,
-    google_listing: "<b>No</b> listing & \"quotes\"",
-    website_and_phone: "w",
-    reviews_and_local_search: "r",
-    problem: "p",
-    solution: { custom_website: true, google_business_profile: false, local_seo: false, booking_quote_form: false, logo_branding: false },
-    solution_note: "n",
-    free_value: { homepage_mockup: false, google_listing_fix: true, review_link_qr: false, site_audit: false },
-    free_value_other: null,
-  };
-  const html = sheetHtml({ business: "Smith <script>alert(1)</script>", dateText: "October 18, 2026", sheet });
-
-  it("escapes everything it prints", () => {
-    expect(html).not.toContain("<script>");
-    expect(html).not.toContain("<b>No</b>");
-    expect(html).toContain("&lt;b&gt;No&lt;/b&gt; listing &amp; &quot;quotes&quot;");
-  });
-
-  it("ticks only the chosen options and prints the fixed text", () => {
-    expect(html.match(/class="cb on"/g)).toHaveLength(2);
-    expect(html).toContain("(781) 248-9834");
-    expect(html).toContain("One monthly fee from $97");
+    expect(() => buildRawEmail({ to: "a@b.example\r\nBcc: x@y.example", subject: "s", text: "t" })).toThrow(/line breaks/);
+    expect(() => buildRawEmail({ to: "a@b.example", subject: "s\nBcc: x@y.example", text: "t" })).toThrow(/line breaks/);
   });
 });

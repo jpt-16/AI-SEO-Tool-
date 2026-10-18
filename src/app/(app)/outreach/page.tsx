@@ -27,7 +27,8 @@ export default async function OutreachPage() {
         <h1 className="text-[32px] leading-[1.06] font-medium tracking-[-0.01em] sm:text-[44px]">Outreach</h1>
         <p className="max-w-2xl text-[15px] leading-relaxed text-muted">
           For each business the tool reads their site, checks it on a phone, searches Google for their listing and reviews,
-          then fills in your &quot;A quick look, made for you&quot; one-pager and a short email to go with it. Set it up once
+          then writes a personal email that follows your one-pager&apos;s four parts: what it found, what that may mean for their
+          customers, how you can help, and what&apos;s free. Set it up once
           below and the drafts show up in your Gmail on their own. Nothing is ever sent for you.
         </p>
       </header>
@@ -37,7 +38,7 @@ export default async function OutreachPage() {
           <h2 className="text-lg font-medium">Automatic outreach</h2>
           <p className="max-w-2xl text-[13.5px] leading-relaxed text-muted">
             Every day at about 10am Eastern the tool finds up to {PER_RUN} new businesses from your saved searches, researches
-            each one and puts a draft email, with the one-pager attached as a PDF, in your Gmail. It never sends anything: you
+            each one and puts a draft email in your Gmail. It never sends anything: you
             open Gmail, read the drafts and send the ones you like.
           </p>
         </div>

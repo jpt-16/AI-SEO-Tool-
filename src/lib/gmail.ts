@@ -18,7 +18,6 @@ export interface DraftInput {
   to: string;
   subject: string;
   text: string;
-  attachment: { filename: string; data: Buffer; contentType: string };
 }
 
 export async function createGmailDraft(input: DraftInput, request?: Requester): Promise<{ id: string }> {

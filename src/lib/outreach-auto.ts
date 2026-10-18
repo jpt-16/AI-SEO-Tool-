@@ -4,7 +4,6 @@ import { createGmailDraft, gmailStatus } from "./gmail";
 import { describeAiError, geminiFromEnv, type GeminiClient } from "./gemini";
 import {
   buildDiscoverySearchPrompt,
-  buildEmail,
   DISCOVERY_EXTRACT_SYSTEM_PROMPT,
   DISCOVERY_SEARCH_SYSTEM_PROMPT,
   DiscoveryOutput,
@@ -13,8 +12,7 @@ import {
   toCandidates,
 } from "./outreach-auto-core";
 import { hostKey } from "./crawl";
-import { renderSheetPdf } from "./outreach-pdf";
-import { formatToday } from "./outreach-sheet";
+import { composeEmail } from "./outreach-sheet";
 import { getProspect, readSite, researchProspect, type DraftState } from "./outreach";
 import { db } from "./supabase";
 
@@ -115,10 +113,9 @@ export async function discoverForSearch(
 export interface Deps {
   readSite: typeof readSite;
   research: typeof researchProspect;
-  renderPdf: typeof renderSheetPdf;
   createDraft: typeof createGmailDraft;
 }
-const defaultDeps: Deps = { readSite, research: researchProspect, renderPdf: renderSheetPdf, createDraft: createGmailDraft };
+const defaultDeps: Deps = { readSite, research: researchProspect, createDraft: createGmailDraft };
 
 export interface ProcessOutcome {
   state: "created" | "no_email" | "skipped" | "failed" | "retry";
@@ -134,9 +131,9 @@ async function drop(id: string, state: DraftState, reason: string, costUsd = 0):
   return { state: state === "none" ? "skipped" : (state as ProcessOutcome["state"]), costUsd, reason };
 }
 
-// Puts the prospect's sheet into Gmail as a draft: the message in the body, the one-pager as a
-// PDF. Never sends. `to` overrides the address found on their site.
-export async function draftProspect(id: string, options: { to?: string; deps?: Pick<Deps, "renderPdf" | "createDraft"> } = {}): Promise<ProcessOutcome> {
+// Puts the prospect's email into Gmail as a draft: a short personal opening, then the one-pager's
+// four sections written out as text. Never sends. `to` overrides the address found on their site.
+export async function draftProspect(id: string, options: { to?: string; deps?: Pick<Deps, "createDraft"> } = {}): Promise<ProcessOutcome> {
   const deps = options.deps ?? defaultDeps;
   const prospect = await getProspect(id);
   if (!prospect) return { state: "failed", costUsd: 0, reason: "That prospect no longer exists." };
@@ -149,19 +146,14 @@ export async function draftProspect(id: string, options: { to?: string; deps?: P
   }
 
   try {
-    const email = buildEmail({
-      businessName: prospect.business_name,
+    const email = composeEmail({
+      business: prospect.business_name,
       subject: prospect.subject,
-      message: prospect.message,
+      opener: prospect.message,
+      sheet: prospect.one_pager,
       postalAddress: process.env.OUTREACH_POSTAL_ADDRESS,
     });
-    const pdf = await deps.renderPdf({ business: prospect.business_name, dateText: formatToday(), sheet: prospect.one_pager });
-    const draft = await deps.createDraft({
-      to,
-      subject: email.subject,
-      text: email.text,
-      attachment: { filename: email.attachmentName, data: pdf, contentType: "application/pdf" },
-    });
+    const draft = await deps.createDraft({ to, subject: email.subject, text: email.text });
     await db()
       .from("outreach_prospects")
       .update({
@@ -183,7 +175,7 @@ export async function draftProspect(id: string, options: { to?: string; deps?: P
 }
 
 // A queued business, start to finish: check the site is theirs and has an email address (cheap,
-// before spending on the AI), research and draft the sheet, then create the Gmail draft.
+// before spending on the AI), research and draft the email, then create the Gmail draft.
 export async function processProspect(id: string, deps: Deps = defaultDeps): Promise<ProcessOutcome> {
   const prospect = await getProspect(id);
   if (!prospect || prospect.status !== "queued") return { state: "skipped", costUsd: 0, reason: "Not queued." };

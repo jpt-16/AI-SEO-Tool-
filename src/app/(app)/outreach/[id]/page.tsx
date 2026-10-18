@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { OnePagerEditor } from "@/components/OnePagerEditor";
+import { EmailEditor } from "@/components/EmailEditor";
 import { DraftToGmailForm } from "@/components/OutreachAuto";
 import { ResearchAgainForm } from "@/components/OutreachForm";
 import { formatDateTime } from "@/lib/format";
 import { getProspect, PROSPECT_STATUSES, STATUS_LABEL, type Prospect } from "@/lib/outreach";
 import { pickEmail } from "@/lib/outreach-auto-core";
-import { formatToday } from "@/lib/outreach-sheet";
 import { deleteProspect, setProspectStatus } from "../../actions";
 
 // "Research and redraft" runs here too.
@@ -159,14 +158,15 @@ export default async function ProspectPage({ params }: PageProps<"/outreach/[id]
       )}
 
       {prospect.one_pager && prospect.message !== null && (
-        <OnePagerEditor
+        <EmailEditor
           // A redraft replaces the content, so remount the editor with the new text.
           key={prospect.researched_at ?? prospect.id}
           prospectId={prospect.id}
           businessName={prospect.business_name}
-          dateText={formatToday()}
           initialSheet={prospect.one_pager}
-          initialMessage={prospect.message}
+          initialOpener={prospect.message}
+          initialSubject={prospect.subject ?? ""}
+          postalAddress={process.env.OUTREACH_POSTAL_ADDRESS ?? null}
         />
       )}
 
