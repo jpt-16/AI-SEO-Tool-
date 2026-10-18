@@ -160,7 +160,8 @@ export async function runBlueprints(
     .eq("site_id", siteId);
   if (countError) throw countError;
   if (!crawledCount && !options.dryRun) {
-    const crawl = await runSiteCrawl(siteId, trigger);
+    // No browser here: visual scores come from the regular crawl, which runs where Chromium is.
+    const crawl = await runSiteCrawl(siteId, trigger, { visual: false });
     if (!crawl.ok) return { ...result, error: `Crawling the site failed: ${crawl.error}` };
   }
 

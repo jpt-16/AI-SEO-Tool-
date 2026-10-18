@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
-// Routes that can run a crawl, which launches headless Chromium for visual scoring.
-const CRAWL_ROUTES = ["/api/crawl", "/api/cron/crawl", "/performance", "/blueprints", "/audit", "/outreach", "/outreach/[id]", "/api/cron/outreach"];
+// Only these two functions launch headless Chromium (about 100 MB, copied into each function that
+// carries it). Every other route calls them over HTTP (see lib/self-call.ts) and has Chromium
+// excluded, because Vercel counts the size of every function of every stored deployment against
+// Functions Storage.
+const BROWSER_ROUTES = ["/api/cron/crawl", "/api/cron/outreach"];
+const BROWSER_FILES = ["./node_modules/@sparticuz/chromium/**", "./node_modules/playwright-core/**"];
+// Routes that import the crawler or research code but never launch the browser themselves.
+const NO_BROWSER_ROUTES = ["/performance", "/blueprints", "/audit", "/outreach", "/outreach/[id]", "/api/audit/export", "/api/crawl"];
 
 const SECURITY_HEADERS = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
@@ -21,9 +27,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["playwright-core", "@sparticuz/chromium", "imapflow"],
   // Both packages read files from disk at runtime (the Chromium binary, playwright's
   // browsers.json), which tracing can't see, so ship them whole.
-  outputFileTracingIncludes: Object.fromEntries(
-    CRAWL_ROUTES.map((route) => [route, ["./node_modules/@sparticuz/chromium/**", "./node_modules/playwright-core/**"]]),
-  ),
+  outputFileTracingIncludes: Object.fromEntries(BROWSER_ROUTES.map((route) => [route, BROWSER_FILES])),
+  outputFileTracingExcludes: Object.fromEntries(NO_BROWSER_ROUTES.map((route) => [route, BROWSER_FILES])),
 };
 
 export default nextConfig;

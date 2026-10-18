@@ -1,21 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ISSUE_TYPES } from "@/lib/audit";
 import { markBlueprintDone } from "@/lib/attribution";
 import { DEFAULT_MIN_IMPRESSIONS, runBlueprints } from "@/lib/blueprints";
 import { isEffort } from "@/lib/effort";
-import { runSiteCrawl } from "@/lib/crawl-run";
+import type { CrawlResult } from "@/lib/crawl-run";
 import { decryptSecret } from "@/lib/crypto";
 import { requireEnv } from "@/lib/env";
 import { isPublicHostname, normalizeWebsite } from "@/lib/outreach-core";
 import { OnePagerSheet } from "@/lib/outreach-sheet";
-import { PROSPECT_STATUSES, researchProspect } from "@/lib/outreach";
+import { PROSPECT_STATUSES, type ResearchResult } from "@/lib/outreach";
 import { draftProspect, redraftExisting, remoteRunner, runOutreachLoop } from "@/lib/outreach-auto";
 import { describeGoogleError, getConnection, gscRequester, oauthClient } from "@/lib/google";
 import { listSites as listGscProperties } from "@/lib/gsc";
+import { callCron, selfOrigin } from "@/lib/self-call";
 import { SITE_COOKIE } from "@/lib/sites";
 import { db } from "@/lib/supabase";
 import { syncSite } from "@/lib/sync";
@@ -68,7 +69,15 @@ export async function runSync(_prev: ActionState | null, formData: FormData): Pr
 }
 
 export async function runCrawl(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
-  const result = await runSiteCrawl(String(formData.get("siteId") ?? ""), "manual");
+  // The crawl (with its browser captures) runs in the cron route, which carries Chromium.
+  let result: CrawlResult;
+  try {
+    const body = await callCron<{ results?: CrawlResult[] }>("/api/cron/crawl", { siteId: String(formData.get("siteId") ?? ""), trigger: "manual" });
+    if (!body.results?.[0]) return { ok: false, message: (body as { error?: string }).error ?? "Crawl failed." };
+    result = body.results[0];
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Crawl failed." };
+  }
   revalidatePath("/", "layout");
   if (!result.ok) return { ok: false, message: result.error ?? "Crawl failed." };
   const failed = result.pagesFailed ? `, ${result.pagesFailed} failed` : "";
@@ -173,6 +182,20 @@ export async function setAuditIssue(formData: FormData) {
 
 const clean = (value: FormDataEntryValue | null) => String(value ?? "").trim() || null;
 
+// Research uses the headless browser, so it runs in the cron route rather than in this function.
+async function researchViaCron(id: string, formData: FormData): Promise<ResearchResult> {
+  try {
+    const body = await callCron<{ result?: ResearchResult }>("/api/cron/outreach", {
+      research: id,
+      search: formData.get("search") === "1" ? "1" : "0",
+      capture: formData.get("capture") === "1" ? "1" : "0",
+    });
+    return body.result ?? { ok: false, error: "The research job returned nothing.", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Research failed.", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 } };
+  }
+}
+
 // Adds a prospect, researches them and drafts the sheet (this can take a minute or two).
 export async function createProspect(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
   const businessName = clean(formData.get("businessName"));
@@ -194,10 +217,8 @@ export async function createProspect(_prev: ActionState | null, formData: FormDa
     .single();
   if (error) return { ok: false, message: error.message };
 
-  await researchProspect(data.id, {
-    search: formData.get("search") === "1",
-    capture: formData.get("capture") === "1",
-  });
+  // A failed draft is shown on the prospect's page, with a button to try again.
+  await researchViaCron(data.id, formData);
   revalidatePath("/outreach");
   // A failed draft is shown on the prospect's page, with a button to try again.
   redirect(`/outreach/${data.id}`);
@@ -205,7 +226,7 @@ export async function createProspect(_prev: ActionState | null, formData: FormDa
 
 export async function researchAgain(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
   const id = String(formData.get("id") ?? "");
-  const result = await researchProspect(id, { search: formData.get("search") === "1", capture: formData.get("capture") === "1" });
+  const result = await researchViaCron(id, formData);
   revalidatePath(`/outreach/${id}`);
   revalidatePath("/outreach");
   if (!result.ok) return { ok: false, message: result.error ?? "Research failed." };
@@ -271,11 +292,7 @@ export async function deleteSearch(formData: FormData) {
 // The same run the daily job does, started by hand.
 export async function runOutreachNow(): Promise<ActionState> {
   const secret = requireEnv("CRON_SECRET");
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (!host) return { ok: false, message: "Couldn't work out this site's address." };
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const result = await runOutreachLoop({ trigger: "manual", runOne: remoteRunner(`${proto}://${host}`, `Bearer ${secret}`) });
+  const result = await runOutreachLoop({ trigger: "manual", runOne: remoteRunner(await selfOrigin(), `Bearer ${secret}`) });
   revalidatePath("/outreach");
   if (!result.ok) return { ok: false, message: result.error ?? "The run failed." };
   const parts = [`${result.found} new businesses found`, `${result.drafted} drafts in Gmail`];

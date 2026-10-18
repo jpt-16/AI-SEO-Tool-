@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
 
   const siteId = request.nextUrl.searchParams.get("siteId");
   if (siteId) {
-    const result = await runSiteCrawl(siteId, "cron");
+    // The Crawl button and /api/crawl call this route too and say who started it.
+    const asked = request.nextUrl.searchParams.get("trigger");
+    const result = await runSiteCrawl(siteId, asked === "manual" || asked === "api" ? asked : "cron");
     return NextResponse.json({ results: [result] }, { status: result.ok ? 200 : 502 });
   }
 
