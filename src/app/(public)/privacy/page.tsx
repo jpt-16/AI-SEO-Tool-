@@ -110,7 +110,8 @@ export default function PrivacyPolicy() {
             For each page we ask it to review, it receives the page&apos;s address, title, description, headings, word count
             and structured-data types, plus that page&apos;s top five Search Console searches with their clicks, impressions,
             click-through rate and position. Google processes this to return the recommendation and, under the paid Gemini API
-            terms, doesn&apos;t use it to train its models.
+            terms, doesn&apos;t use it to train its models. For outreach drafts it receives only public information about a
+            business we&apos;re writing to: text from its website and what a Google search finds.
           </li>
           <li>
             <strong className="font-medium text-ink">Google</strong> is the source of the Search Console data and handles

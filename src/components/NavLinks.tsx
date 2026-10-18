@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartIcon, ClipboardIcon, CompareIcon, LinkIcon, SearchIcon } from "./icons";
+import { ChartIcon, ClipboardIcon, CompareIcon, LinkIcon, MailIcon, SearchIcon } from "./icons";
 
 const LINKS = [
   { href: "/performance", label: "Search performance", Icon: ChartIcon },
   { href: "/blueprints", label: "Blueprints", Icon: ClipboardIcon },
   { href: "/results", label: "Results", Icon: CompareIcon },
   { href: "/audit", label: "Site audit", Icon: SearchIcon },
+  { href: "/outreach", label: "Outreach", Icon: MailIcon },
   { href: "/connections", label: "Connections", Icon: LinkIcon },
 ];
 

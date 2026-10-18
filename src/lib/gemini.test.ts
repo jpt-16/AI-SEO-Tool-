@@ -83,3 +83,46 @@ describe("describeAiError", () => {
     expect(describeAiError(new Error("boom"))).toBe("boom");
   });
 });
+
+describe("search", () => {
+  const searchRequest = { model: "gemini-3.8-flash", system: "sys", prompt: "find it", thinkingLevel: "low" as const, maxOutputTokens: 1000 };
+
+  it("turns on Google Search grounding and returns the text with its sources", async () => {
+    const { calls, client } = stub(
+      reply({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: { parts: [{ text: "Listing found. " }, { text: "4.8 stars." }] },
+            groundingMetadata: {
+              groundingChunks: [
+                { web: { uri: "https://maps.example/a", title: "Maps" } },
+                { web: { uri: "https://maps.example/a", title: "Maps again" } },
+                { web: { uri: "https://yelp.example/b" } },
+              ],
+            },
+          },
+        ],
+        usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 10, thoughtsTokenCount: 5 },
+      }),
+    );
+    const result = await client.search(searchRequest);
+    expect(result).toEqual({
+      text: "Listing found. 4.8 stars.",
+      sources: [
+        { title: "Maps", url: "https://maps.example/a" },
+        { title: "https://yelp.example/b", url: "https://yelp.example/b" },
+      ],
+      inputTokens: 50,
+      outputTokens: 15,
+    });
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body.tools).toEqual([{ google_search: {} }]);
+    expect(body.generationConfig.responseMimeType).toBeUndefined();
+  });
+
+  it("fails clearly when nothing comes back", async () => {
+    await expect(stub(reply({ candidates: [{ finishReason: "STOP", content: { parts: [] } }] })).client.search(searchRequest)).rejects.toMatchObject({ kind: "blocked" });
+    await expect(stub(reply({ promptFeedback: { blockReason: "SAFETY" } })).client.search(searchRequest)).rejects.toMatchObject({ kind: "blocked" });
+  });
+});

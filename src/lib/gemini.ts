@@ -38,12 +38,36 @@ export interface GeminiResult<T> {
   outputTokens: number;
 }
 
+export interface GeminiSearchRequest {
+  model: string;
+  system: string;
+  prompt: string;
+  thinkingLevel: ThinkingLevel;
+  maxOutputTokens: number;
+}
+
+export interface GeminiSearchResult {
+  // The model's findings as plain text, grounded in Google Search results.
+  text: string;
+  // Pages the answer was grounded on.
+  sources: { title: string; url: string }[];
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface GeminiClient {
   generateJson<T>(request: GeminiRequest<T>): Promise<GeminiResult<T>>;
+  // Answers using live Google Search (grounding). Plain text, since structured output and
+  // search grounding don't combine reliably: draft from this with generateJson.
+  search(request: GeminiSearchRequest): Promise<GeminiSearchResult>;
 }
 
 interface GenerateContentResponse {
-  candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+  candidates?: {
+    finishReason?: string;
+    content?: { parts?: { text?: string; thought?: boolean }[] };
+    groundingMetadata?: { groundingChunks?: { web?: { uri?: string; title?: string } }[] };
+  }[];
   promptFeedback?: { blockReason?: string };
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
   error?: { code?: number; message?: string; status?: string };
@@ -88,7 +112,41 @@ export function createGeminiClient(apiKey: string, fetchImpl: typeof fetch = fet
     }
   }
 
+  const tokens = (json: GenerateContentResponse) => {
+    const usage = json.usageMetadata ?? {};
+    return {
+      inputTokens: usage.promptTokenCount ?? 0,
+      // Answer plus thinking tokens: both bill at the output rate.
+      outputTokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
+    };
+  };
+
   return {
+    async search(request: GeminiSearchRequest): Promise<GeminiSearchResult> {
+      const json = await post(request.model, {
+        systemInstruction: { parts: [{ text: request.system }] },
+        contents: [{ role: "user", parts: [{ text: request.prompt }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: { maxOutputTokens: request.maxOutputTokens, thinkingConfig: { thinkingLevel: request.thinkingLevel } },
+      });
+      if (json.promptFeedback?.blockReason) {
+        throw new GeminiError(`Gemini blocked this search (${json.promptFeedback.blockReason}).`, "blocked");
+      }
+      const candidate = json.candidates?.[0];
+      if (candidate?.finishReason === "MAX_TOKENS") throw new GeminiError("Gemini's answer was cut off (max tokens).", "truncated");
+      const text = (candidate?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
+      if (!text) throw new GeminiError(`Gemini returned no answer (${candidate?.finishReason ?? "no candidates"}).`, "blocked");
+
+      const seen = new Set<string>();
+      const sources = (candidate?.groundingMetadata?.groundingChunks ?? []).flatMap((c) => {
+        const url = c.web?.uri;
+        if (!url || seen.has(url)) return [];
+        seen.add(url);
+        return [{ title: c.web?.title ?? url, url }];
+      });
+      return { text, sources, ...tokens(json) };
+    },
+
     async generateJson<T>(request: GeminiRequest<T>): Promise<GeminiResult<T>> {
       const json = await post(request.model, {
         systemInstruction: { parts: [{ text: request.system }] },
@@ -120,14 +178,15 @@ export function createGeminiClient(apiKey: string, fetchImpl: typeof fetch = fet
       const parsed = request.schema.safeParse(data);
       if (!parsed.success) throw new GeminiError("Gemini's answer didn't match the blueprint format.", "format");
 
-      const usage = json.usageMetadata ?? {};
-      return {
-        parsed: parsed.data,
-        inputTokens: usage.promptTokenCount ?? 0,
-        outputTokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
-      };
+      return { parsed: parsed.data, ...tokens(json) };
     },
   };
+}
+
+export function geminiFromEnv(): GeminiClient {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY isn't set.");
+  return createGeminiClient(key);
 }
 
 export function describeAiError(err: unknown): string {

@@ -77,3 +77,32 @@ export const CompareIcon = (p: P) => (
     <path d="M20 20V8" />
   </Icon>
 );
+export const MailIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </Icon>
+);
+export const AlertIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 3 2.5 20h19L12 3Z" />
+    <path d="M12 10v4.5" />
+    <path d="M12 17.5v.01" />
+  </Icon>
+);
+export const BulbIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M9 18h6" />
+    <path d="M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z" />
+  </Icon>
+);
+export const GiftIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="8" width="18" height="4" rx="1" />
+    <path d="M12 8v13" />
+    <path d="M5 12v9h14v-9" />
+    <path d="M12 8c-1.5-4-6-3.5-5 0 .5 1.5 5 0 5 0Z" />
+    <path d="M12 8c1.5-4 6-3.5 5 0-.5 1.5-5 0-5 0Z" />
+  </Icon>
+);

@@ -254,6 +254,35 @@ input for `gemini-3.8-flash`, introductory pricing that becomes $7.50 vs $1.50 o
 Each run stores `effort`, `pages_reused`, `input_tokens`, `output_tokens` and `cost_usd` in
 `blueprint_runs`, and the Blueprints page shows the last run's actual cost.
 
+## Outreach (cold-outreach one-pager)
+
+**Outreach** fills in the "A quick look, made for you" one-pager for a business you haven't spoken to, and
+writes the short message to send with it. Nothing is sent for you.
+
+Enter the business name and website (town, owner and "what you already know" are optional but make it
+better). `src/lib/outreach.ts` then:
+
+1. **Reads their site**: the homepage plus its contact, about and services pages. Phone numbers, whether
+   the number is tap-to-call, email, quote/booking form, social and Google Maps links, site platform,
+   footer year, schema, and the start of the page text (`extractFacts()` in `src/lib/outreach-core.ts`).
+2. **Checks the homepage on a phone** with the same capture used for the Site audit (score, sideways
+   scrolling, weak spots, call-to-action).
+3. **Searches Google** through Gemini's search grounding (`GeminiClient.search()`) for their Business
+   Profile, reviews, directory listings and local search presence, keeping the sources.
+4. **Drafts the sheet** from all of that plus your notes, as structured JSON (`OnePagerOutput` in
+   `src/lib/outreach-sheet.ts`): the three research rows, "their problem", which services and free
+   offers to tick, the message, and a **Check before sending** list of anything uncertain.
+
+The prompt tells the model to use only what it was given, say "I couldn't find…" instead of guessing, hedge
+("may"), and treat your notes as true. Steps 1 to 3 are best effort: if one fails the draft still happens and
+the failure is shown on the prospect's page. The sheet is editable on screen; **Print / save as PDF** prints
+exactly one US Letter page (print CSS in `globals.css`), and **Copy as text** gives a plain-text version.
+Prospects are stored in `outreach_prospects` with a status (draft, sent, replied, passed). The fixed text
+(price line, phone, sender) is in `OUTREACH` in `src/lib/outreach-sheet.ts`.
+
+Cost is shown per prospect (draft plus search tokens). Google may also bill a per-search fee for Gemini's
+Google Search grounding; that isn't included, and you can untick the search on the form.
+
 ## Results (attribution)
 
 `src/lib/attribution.ts` measures whether a finished blueprint moved anything:

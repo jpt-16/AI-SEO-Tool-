@@ -10,6 +10,9 @@ import { isEffort } from "@/lib/effort";
 import { runSiteCrawl } from "@/lib/crawl-run";
 import { decryptSecret } from "@/lib/crypto";
 import { requireEnv } from "@/lib/env";
+import { isPublicHostname, normalizeWebsite } from "@/lib/outreach-core";
+import { OnePagerSheet } from "@/lib/outreach-sheet";
+import { PROSPECT_STATUSES, researchProspect } from "@/lib/outreach";
 import { describeGoogleError, getConnection, gscRequester, oauthClient } from "@/lib/google";
 import { listSites as listGscProperties } from "@/lib/gsc";
 import { SITE_COOKIE } from "@/lib/sites";
@@ -163,4 +166,76 @@ export async function setAuditIssue(formData: FormData) {
         );
   if (error) throw error;
   revalidatePath("/audit");
+}
+
+// ---- Outreach ----
+
+const clean = (value: FormDataEntryValue | null) => String(value ?? "").trim() || null;
+
+// Adds a prospect, researches them and drafts the sheet (this can take a minute or two).
+export async function createProspect(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
+  const businessName = clean(formData.get("businessName"));
+  if (!businessName) return { ok: false, message: "Enter the business name." };
+  const website = normalizeWebsite(String(formData.get("website") ?? ""));
+  if (!website) return { ok: false, message: "Enter their website, like example.com." };
+  if (!isPublicHostname(new URL(website).hostname)) return { ok: false, message: "That isn't a public website address." };
+
+  const { data, error } = await db()
+    .from("outreach_prospects")
+    .insert({
+      business_name: businessName,
+      website,
+      owner_name: clean(formData.get("ownerName")),
+      city: clean(formData.get("city")),
+      notes: clean(formData.get("notes")),
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  await researchProspect(data.id, {
+    search: formData.get("search") === "1",
+    capture: formData.get("capture") === "1",
+  });
+  revalidatePath("/outreach");
+  // A failed draft is shown on the prospect's page, with a button to try again.
+  redirect(`/outreach/${data.id}`);
+}
+
+export async function researchAgain(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
+  const id = String(formData.get("id") ?? "");
+  const result = await researchProspect(id, { search: formData.get("search") === "1", capture: formData.get("capture") === "1" });
+  revalidatePath(`/outreach/${id}`);
+  revalidatePath("/outreach");
+  if (!result.ok) return { ok: false, message: result.error ?? "Research failed." };
+  return { ok: true, message: `Redrafted · cost $${result.usage.costUsd.toFixed(3)} (not counting Google Search fees).` };
+}
+
+export async function saveSheet(id: string, sheet: unknown, message: string): Promise<ActionState> {
+  const parsed = OnePagerSheet.safeParse(sheet);
+  if (!parsed.success) return { ok: false, message: "The sheet has a missing field." };
+  const { error } = await db()
+    .from("outreach_prospects")
+    .update({ one_pager: parsed.data, message, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/outreach/${id}`);
+  return { ok: true, message: "Saved." };
+}
+
+export async function setProspectStatus(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (!PROSPECT_STATUSES.includes(status as (typeof PROSPECT_STATUSES)[number])) throw new Error("Invalid status.");
+  const { error } = await db().from("outreach_prospects").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+  revalidatePath(`/outreach/${id}`);
+  revalidatePath("/outreach");
+}
+
+export async function deleteProspect(formData: FormData) {
+  const { error } = await db().from("outreach_prospects").delete().eq("id", String(formData.get("id") ?? ""));
+  if (error) throw error;
+  revalidatePath("/outreach");
+  redirect("/outreach");
 }
