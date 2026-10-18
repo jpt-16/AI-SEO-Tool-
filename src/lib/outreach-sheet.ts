@@ -20,7 +20,11 @@ export const SOLUTION_ITEMS = [
   { key: "local_seo", label: "Local SEO" },
   { key: "booking_quote_form", label: "Booking / quote form" },
   { key: "logo_branding", label: "Logo & branding" },
+  { key: "ai_automation", label: "AI automation" },
 ] as const;
+
+// The packages the monthly price line covers; AI automation is scoped separately.
+const WEBSITE_PACKAGE = ["custom_website", "google_business_profile", "local_seo", "booking_quote_form", "logo_branding"] as const;
 
 export const FREE_VALUE_ITEMS = [
   { key: "homepage_mockup", label: "Free homepage mockup" },
@@ -31,6 +35,12 @@ export const FREE_VALUE_ITEMS = [
 
 const flags = <K extends string>(keys: readonly K[]) => z.object(Object.fromEntries(keys.map((k) => [k, z.boolean()])) as Record<K, z.ZodBoolean>);
 
+export const Automation = z.object({
+  idea: z.string().describe("A short name for the automation, in plain words, like 'Missed-call text-back'."),
+  problem: z.string().describe("What is probably happening in a business like this that the automation would fix, in one or two plain sentences. Tie it to something seen in the research and hedge ('probably', 'may'): you can't know their day-to-day."),
+  how: z.string().describe("What the automation would do for them, in one plain sentence. No jargon, no brand names of AI tools."),
+});
+
 // What the model returns. Field descriptions are part of the prompt.
 export const OnePagerOutput = z.object({
   owner_name: z.string().nullable().describe("The owner's name only if the sources state it; otherwise null."),
@@ -40,6 +50,7 @@ export const OnePagerOutput = z.object({
   problem: z.string().describe("Section 02: what these findings may mean for their customers, in plain words, 2 to 3 sentences, around 350 characters at most. Hedge with 'may' or 'could'."),
   solution: flags(SOLUTION_ITEMS.map((i) => i.key)).describe("Tick only the services that fix something named in the research."),
   solution_note: z.string().describe("Section 03 note: one or two sentences, around 160 characters, saying how those services fit this business."),
+  automations: z.array(Automation).describe("Two or three specific AI automations that would save this business time or win it jobs, based on problems it probably has. Tick 'ai_automation' in solution when this isn't empty."),
   free_value: flags(FREE_VALUE_ITEMS.map((i) => i.key)).describe("Tick the one to three free offers that best fit this business."),
   free_value_other: z.string().nullable().describe("Optional extra free offer, a few words, or null."),
   subject: z.string().describe("Email subject line: specific to this business, under 60 characters, plain, no hype, no clickbait, no ALL CAPS."),
@@ -50,7 +61,13 @@ export const OnePagerOutput = z.object({
 export type OnePagerDraft = z.infer<typeof OnePagerOutput>;
 
 // The sheet as printed and edited (the draft minus the notes that aren't on it).
-export const OnePagerSheet = OnePagerOutput.omit({ subject: true, message: true, unverified: true });
+// Older sheets have no automations or AI box: they read as empty / unticked.
+const sheetFlags = <K extends string>(keys: readonly K[]) => z.object(Object.fromEntries(keys.map((k) => [k, z.boolean().default(false)])) as Record<K, z.ZodDefault<z.ZodBoolean>>);
+export const OnePagerSheet = OnePagerOutput.omit({ subject: true, message: true, unverified: true }).extend({
+  solution: sheetFlags(SOLUTION_ITEMS.map((i) => i.key)),
+  free_value: sheetFlags(FREE_VALUE_ITEMS.map((i) => i.key)),
+  automations: z.array(Automation).default([]),
+});
 export type OnePagerSheetData = z.infer<typeof OnePagerSheet>;
 
 export const sheetFromDraft = (d: OnePagerDraft): OnePagerSheetData => OnePagerSheet.parse(d);
@@ -79,7 +96,9 @@ export function composeEmail(input: {
   const { sheet } = input;
   const ticked = <T extends { key: string; label: string }>(items: readonly T[], on: Record<string, boolean>) => items.filter((i) => on[i.key]).map((i) => i.label);
   const help = ticked(SOLUTION_ITEMS, sheet.solution);
+  const sellsWebsite = WEBSITE_PACKAGE.some((key) => sheet.solution[key]);
   const free = [...ticked(FREE_VALUE_ITEMS, sheet.free_value), ...(sheet.free_value_other?.trim() ? [sheet.free_value_other.trim()] : [])];
+  const automations = (sheet.automations ?? []).filter((a) => a.idea.trim());
 
   const opener = input.opener.trim();
   // Messages drafted before the opener existed already start with a greeting.
@@ -100,7 +119,17 @@ export function composeEmail(input: {
     "How I can help",
     ...(help.length ? [`${help.join(", ")}.`] : []),
     sheet.solution_note,
-    OUTREACH.price,
+    // The monthly price covers the website packages only.
+    ...(sellsWebsite ? [OUTREACH.price] : []),
+    ...(automations.length
+      ? [
+          "",
+          "A few AI automations that could take work off your plate",
+          ...automations.map((a) => `- ${a.idea.trim()}: ${a.problem.trim()} ${a.how.trim()}`.trim()),
+          "",
+          "If one of these sounds useful, reply and tell me which. I'll send a short outline of how it would work in your business.",
+        ]
+      : []),
     "",
     "Free, no strings",
     ...(free.length ? [`${free.join(", ")}.`] : []),

@@ -297,13 +297,24 @@ Set up once under **Outreach → Automatic outreach**, then it runs by itself:
 - Per business, cheapest checks first: read their site; skip it if it doesn't look like that business or has
   **no email address** (`pickEmail()` prefers a general inbox on their own domain); only then research and draft the
   email, and create the **Gmail draft** via `users.drafts.create`. The email is plain text: a short personal
-  opening, then the one-pager's four parts (what I found, what it may mean for your customers, how I can help
-  with the price line, what's free), a signature and an opt-out line (`composeEmail()` in
+  opening, then the one-pager's parts (what I found, what it may mean for your customers, how I can help
+  with the price line, **two or three AI automation ideas** specific to that business, what's free), a
+  signature and an opt-out line (`composeEmail()` in
   `src/lib/outreach-sheet.ts`). No attachment.
 - Each run is logged (found / drafted / no email / skipped / failed / cost) on the Outreach page. **Run now**
   does the same by hand. A business whose research fails is retried once the next day, then dropped.
 - The email body ends with your signature and a "reply no thanks" opt-out line. Set **`OUTREACH_POSTAL_ADDRESS`**
   to add a postal address to it (US commercial email law asks for one).
+
+**AI automation ideas.** The model is asked for two or three automations that fit the business (missed-call
+text-back, quote follow-ups, an after-hours assistant, review requests, appointment reminders, estimate
+drafting, invoice reminders and similar), each with the problem such businesses probably have and what the
+automation would do, hedged as "probably" since it can't know their day-to-day (`Automation` in
+`src/lib/outreach-sheet.ts`). Chat, booking and CRM tools found on their site (`TOOLS` in
+`src/lib/outreach-core.ts`) are passed in so it doesn't pitch what they already have, and when the website
+is already good the pitch leans on automations instead of a new site. The monthly price line is only added
+when a website, listing or SEO item is ticked; automations have no price in the email. Sheets made before this
+existed read as having none, and "Research and redraft" adds them.
 
 **Needs `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD`.** The tool saves drafts over IMAP (`src/lib/gmail.ts`)
 using a Gmail **app password** (myaccount.google.com/apppasswords; needs 2-Step Verification), so there is no

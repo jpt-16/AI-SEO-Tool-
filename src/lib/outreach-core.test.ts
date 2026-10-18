@@ -49,6 +49,12 @@ describe("extractFacts", () => {
     expect(f.h1).toEqual(["Plumbing you can trust"]);
   });
 
+  it("detects chat and booking tools the site already uses", () => {
+    const html = '<html><body><script src="https://embed.tawk.to/abc/1"></script><a href="https://calendly.com/smith">Book</a></body></html>';
+    expect(extractFacts(html, "https://x.example/").tools).toEqual(["Calendly booking", "Tawk.to chat"]);
+    expect(extractFacts(HOME, "https://smith.example/").tools).toEqual([]);
+  });
+
   it("reports what's missing on a bare page", () => {
     const bare = extractFacts("<html><body><p>Hello</p></body></html>", "https://x.example/");
     expect(bare).toMatchObject({ phones: [], hasTelLink: false, emails: [], hasForm: false, platform: null, hasViewportMeta: false, copyrightYear: null, mentionsReviews: false });
@@ -113,7 +119,7 @@ describe("prompts", () => {
       searchError: null,
     };
     const prompt = buildDraftPrompt(input, research, "October 18, 2026");
-    for (const part of ["No Google listing that I can see.", "+1 (508) 555-0142", "Tap-to-call link: yes", "62/100", "Listing: not found", "https://yelp.example/s", "Built with: WordPress"]) {
+    for (const part of ["Chat / booking / CRM tools detected on the site: none", "No Google listing that I can see.", "+1 (508) 555-0142", "Tap-to-call link: yes", "62/100", "Listing: not found", "https://yelp.example/s", "Built with: WordPress"]) {
       expect(prompt).toContain(part);
     }
 
@@ -130,8 +136,12 @@ const draft = {
   website_and_phone: "Your number is on the site but isn't tap-to-call.",
   reviews_and_local_search: "I couldn't find reviews online.",
   problem: "Someone searching on a phone may not be able to find you or call quickly.",
-  solution: { custom_website: false, google_business_profile: true, local_seo: true, booking_quote_form: false, logo_branding: false },
+  solution: { custom_website: false, google_business_profile: true, local_seo: true, booking_quote_form: false, logo_branding: false, ai_automation: true },
   solution_note: "A listing plus a tap-to-call button would put you in front of nearby customers.",
+  automations: [
+    { idea: "Missed-call text-back", problem: "When the crew is on a job, calls probably go to voicemail and those customers may call the next company.", how: "It texts the caller within seconds, asks what they need and sends you the details." },
+    { idea: "Quote follow-up", problem: "Estimates may go quiet after you send them.", how: "It checks in with each customer a few days later and tells you who replied." },
+  ],
   free_value: { homepage_mockup: false, google_listing_fix: true, review_link_qr: true, site_audit: false },
   free_value_other: null,
   subject: "A quick look at Smith & Sons online",
@@ -146,6 +156,15 @@ describe("one-pager", () => {
     expect(Object.keys(sheet)).not.toContain("subject");
     expect(Object.keys(sheet)).not.toContain("unverified");
     expect(OnePagerSheet.safeParse(sheet).success).toBe(true);
+  });
+
+  it("reads a sheet saved before AI automations existed", () => {
+    const old = { ...sheetFromDraft(OnePagerOutput.parse(draft)) } as Record<string, unknown>;
+    delete old.automations;
+    old.solution = { custom_website: true, google_business_profile: false, local_seo: false, booking_quote_form: false, logo_branding: false };
+    const parsed = OnePagerSheet.parse(old);
+    expect(parsed.automations).toEqual([]);
+    expect(parsed.solution.ai_automation).toBe(false);
   });
 
   it("rejects a draft missing a field", () => {
@@ -169,15 +188,29 @@ describe("composeEmail", () => {
   it("follows the four parts of the one-pager, in order, with only the ticked options", () => {
     const { text, subject } = composeEmail(base);
     expect(subject).toBe("A quick look at Smith & Sons");
-    const order = ["Hi Pat,", "I liked the reviews", "- Google listing:", "- Website & phone:", "- Reviews & local search:", "What this may mean for your customers", "How I can help", "Free, no strings", "Reply to this email"].map((part) => text.indexOf(part));
+    const order = ["Hi Pat,", "I liked the reviews", "- Google listing:", "- Website & phone:", "- Reviews & local search:", "What this may mean for your customers", "How I can help", "A few AI automations", "Free, no strings", "Reply to this email"].map((part) => text.indexOf(part));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(text).toContain("Google Business Profile, Local SEO.");
+    expect(text).toContain("Google Business Profile, Local SEO, AI automation.");
+    expect(text).toContain("- Missed-call text-back: When the crew is on a job, calls probably go to voicemail and those customers may call the next company. It texts the caller within seconds");
+    expect(text).toContain("- Quote follow-up:");
+    expect(text).toContain("I'll send a short outline of how it would work in your business.");
     expect(text).toContain("Free Google listing fix, Free review link + QR code.");
     expect(text).not.toContain("Custom website");
     expect(text).toContain("One monthly fee from $97. No setup cost, no contract. Cancel whenever you like.");
     expect(text).toContain("(781) 248-9834");
     expect(text).toContain('reply "no thanks"');
+  });
+
+  it("leaves out the automation section when there are none, and the price when no website package is ticked", () => {
+    const none = composeEmail({ ...base, sheet: { ...sheet, automations: [] } }).text;
+    expect(none).not.toContain("AI automations");
+    expect(none).toContain("One monthly fee from $97");
+
+    const aiOnly = composeEmail({ ...base, sheet: { ...sheet, solution: { ...sheet.solution, google_business_profile: false, local_seo: false, ai_automation: true } } }).text;
+    expect(aiOnly).toContain("How I can help\nAI automation.");
+    expect(aiOnly).not.toContain("One monthly fee from $97");
+    expect(aiOnly).toContain("A few AI automations");
   });
 
   it("greets by first name, or generically when the owner is unknown", () => {

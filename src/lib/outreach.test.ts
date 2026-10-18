@@ -49,8 +49,12 @@ const draft = {
   website_and_phone: "Phone is plain text.",
   reviews_and_local_search: "No reviews found.",
   problem: "Customers may struggle to call.",
-  solution: { custom_website: true, google_business_profile: true, local_seo: true, booking_quote_form: false, logo_branding: false },
+  solution: { custom_website: true, google_business_profile: true, local_seo: true, booking_quote_form: false, logo_branding: false, ai_automation: true },
   solution_note: "A listing and tap-to-call.",
+  automations: [
+    { idea: "Missed-call text-back", problem: "When the crew is on a job, calls probably go to voicemail and those customers may call the next company.", how: "It texts the caller within seconds, asks what they need and sends you the details." },
+    { idea: "Quote follow-up", problem: "Estimates may go quiet after you send them.", how: "It checks in with each customer a few days later and tells you who replied." },
+  ],
   free_value: { homepage_mockup: true, google_listing_fix: true, review_link_qr: false, site_audit: false },
   free_value_other: null,
   subject: "A quick look at Smith Plumbing online",

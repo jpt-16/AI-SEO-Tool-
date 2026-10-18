@@ -16,7 +16,7 @@ import {
   type ProspectInput,
   type ResearchBundle,
 } from "./outreach-core";
-import { formatToday, OnePagerOutput, sheetFromDraft, type OnePagerSheetData } from "./outreach-sheet";
+import { formatToday, OnePagerOutput, OnePagerSheet, sheetFromDraft, type OnePagerSheetData } from "./outreach-sheet";
 import { db } from "./supabase";
 import { captureSite, type VisualCapture } from "./visual";
 
@@ -61,16 +61,22 @@ export interface Prospect {
 const COLUMNS =
   "id, created_at, business_name, website, owner_name, city, notes, status, research, one_pager, message, subject, unverified, email, source, search_id, attempts, draft_state, gmail_draft_id, drafted_at, draft_error, skip_reason, model, cost_usd, researched_at, research_error";
 
+// Sheets saved before AI automations existed lack those fields: fill them in.
+const withDefaults = (row: Prospect): Prospect => {
+  const parsed = row.one_pager ? OnePagerSheet.safeParse(row.one_pager) : null;
+  return parsed?.success ? { ...row, one_pager: parsed.data } : row;
+};
+
 export async function listProspects(): Promise<Prospect[]> {
   const { data, error } = await db().from("outreach_prospects").select(COLUMNS).order("created_at", { ascending: false }).limit(200);
   if (error) throw error;
-  return data as Prospect[];
+  return (data as Prospect[]).map(withDefaults);
 }
 
 export async function getProspect(id: string): Promise<Prospect | null> {
   const { data, error } = await db().from("outreach_prospects").select(COLUMNS).eq("id", id).maybeSingle();
   if (error) throw error;
-  return (data as Prospect | null) ?? null;
+  return data ? withDefaults(data as Prospect) : null;
 }
 
 async function getHtml(fetchImpl: typeof fetch, url: string): Promise<{ html: string; url: string }> {

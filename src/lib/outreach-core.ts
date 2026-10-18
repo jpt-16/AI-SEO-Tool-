@@ -23,6 +23,8 @@ export interface PageFacts {
   hasForm: boolean;
   formMentionsQuote: boolean;
   platform: string | null;
+  // Chat, booking, CRM and review tools the page loads, so we never pitch what they already have.
+  tools: string[];
   hasViewportMeta: boolean;
   copyrightYear: number | null;
   mentionsReviews: boolean;
@@ -41,6 +43,23 @@ const PLATFORMS: [RegExp, string][] = [
   [/godaddy|secureserver\.net/i, "GoDaddy"],
   [/weebly/i, "Weebly"],
   [/webflow/i, "Webflow"],
+];
+const TOOLS: [RegExp, string][] = [
+  [/calendly\.com/i, "Calendly booking"],
+  [/getjobber|jobber\.com/i, "Jobber"],
+  [/housecallpro/i, "Housecall Pro"],
+  [/servicetitan/i, "ServiceTitan"],
+  [/podium\.com|podium-webchat/i, "Podium chat/reviews"],
+  [/birdeye/i, "Birdeye reviews"],
+  [/intercom/i, "Intercom chat"],
+  [/js\.driftt|drift\.com/i, "Drift chat"],
+  [/tidio/i, "Tidio chat"],
+  [/livechatinc|livechat\.com/i, "LiveChat"],
+  [/tawk\.to/i, "Tawk.to chat"],
+  [/hs-scripts|hubspot/i, "HubSpot"],
+  [/chatbot|chat-widget|chatwidget/i, "a chat widget"],
+  [/acuityscheduling|squareup\.com\/appointments|setmore|booksy|vagaro/i, "online booking"],
+  [/thumbtack|angi\.com\/|homeadvisor/i, "lead-marketplace badges"],
 ];
 const TEXT_CHARS = 1500;
 
@@ -88,6 +107,7 @@ export function extractFacts(html: string, pageUrl: string): PageFacts {
     hasForm: forms.length > 0,
     formMentionsQuote: forms.some((el) => /\b(quote|estimate|book|booking|appointment|schedule|request)\b/i.test($(el).text() + " " + $(el).find("button, input[type=submit]").toArray().map((b) => $(b).attr("value") ?? "").join(" "))),
     platform: PLATFORMS.find(([re]) => re.test(sniff))?.[1] ?? null,
+    tools: TOOLS.filter(([re]) => re.test(sniff)).map(([, name]) => name),
     hasViewportMeta: /width\s*=\s*device-width/i.test($('meta[name="viewport" i]').attr("content") ?? ""),
     copyrightYear: years.length ? Math.max(...years) : null,
     mentionsReviews: /\b(reviews?|testimonials?|five.star|5.star)\b/i.test(text),
@@ -112,6 +132,7 @@ export function mergeFacts(pages: PageFacts[]): PageFacts & { pagesRead: string[
     formMentionsQuote: all.some((p) => p.formMentionsQuote),
     mentionsReviews: all.some((p) => p.mentionsReviews),
     schemaTypes: uniq(all.flatMap((p) => p.schemaTypes)).sort(),
+    tools: uniq(all.flatMap((p) => p.tools)),
     // Other pages' headings and text help the model understand the business.
     h2: uniq([...home.h2, ...rest.flatMap((p) => p.h2)]).slice(0, 16),
     text: [home.text, ...rest.map((p) => `[${new URL(p.url).pathname}] ${p.text.slice(0, 500)}`)].join("\n"),
@@ -188,10 +209,11 @@ Find:
 2. What recent reviewers say (themes, with a short quote or two if you can find them), and whether the owner replies to reviews.
 3. Other listings (Facebook, Yelp, Angi, Nextdoor and similar): which exist.
 4. How they appear in local search for what they do in their town (for example "their trade + town"): do they appear on the first page or in the map results? Only say what the results show.
-5. The owner's or founder's name, if it is published.`;
+5. The owner's or founder's name, if it is published.
+6. What the business actually does day to day: its main services, whether it offers emergency or after-hours work, its service area, roughly how big it is (one person, a small crew, many trucks), and how customers book or ask for quotes (phone only, a form, online booking).`;
 }
 
-export const DRAFT_SYSTEM_PROMPT = `You write the content of a cold email that ${OUTREACH.sender} (founder of JT Builds Co., a small web design and local SEO studio in ${OUTREACH.location}) sends to a local business he has never spoken to. The email follows a fixed four-part structure: 1. Show your research, 2. Their problem, 3. Your solution, 4. Free value. You fill in each part. It must read like a friendly, specific note from a real person, not a mass mailing.
+export const DRAFT_SYSTEM_PROMPT = `You write the content of a cold email that ${OUTREACH.sender} (founder of JT Builds Co., a small web design and local SEO studio in ${OUTREACH.location}) sends to a local business he has never spoken to. The email follows a fixed structure: 1. Show your research, 2. Their problem, 3. Your solution, then a short list of AI automation ideas, then 4. Free value. You fill in each part. It must read like a friendly, specific note from a real person, not a mass mailing.
 
 You get: what ${OUTREACH.sender} already knows (his notes), facts read directly from the business's website, a phone-screen check of the homepage, and web search findings with sources.
 
@@ -200,10 +222,12 @@ Rules:
 - Say what you saw, not what you assume. If the search findings are uncertain or about a possibly different business, leave them out and add the doubt to "unverified".
 - Be kind and specific. Never insult their business or call their site bad. Lead with something genuine about the business (what they do, a happy-customer theme, how long they've been around) where the material has it.
 - "Their problem" explains, in plain words, what the findings may mean for their customers (for example, someone searching on a phone can't tap to call). Hedge with "may" or "could". No SEO jargon, no scare tactics, no invented statistics.
+- If the website is already in good shape (it fits a phone, the number is tap-to-call, there is a quote or booking form, nothing important is missing), do NOT pitch a new site or logo: say something true and kind about it and put the weight on the AI automations instead. Tick the website, Google Business Profile or local SEO items only when the research shows a real gap.
 - Tick only the services that address something in the research, and only the free offers that fit (a business with no Google listing gets "Free Google listing fix"; one with an outdated site gets "Free homepage mockup"; one with happy customers and few reviews gets the review link + QR code; "Free 1-page site audit" fits almost anyone with a site).
+- "automations": propose two or three specific AI automations for THIS business, chosen for its trade and size and for problems it probably has. Draw on the evidence (how jobs come in, hours or emergency work, a phone-only contact, no booking form, review themes, crew size) and on what tools it already uses, and never pitch something it already has. Good ideas include: a missed-call text-back that replies in seconds and collects the job details; instant replies and follow-ups to quote or estimate requests; an after-hours assistant that answers common questions and books appointments; automatic review requests after each job; appointment reminders to cut no-shows; drafting estimates or proposals from a few notes or photos; invoice and payment reminders; seasonal re-engagement messages to past customers; sorting and prioritising incoming leads. Pick the ones that fit, in plain words. For each, "problem" says what probably happens today (hedge: "probably", "may"; you can't know their day-to-day, so write it as what is common for businesses like theirs, not as a fact about them), and "how" says what the automation would do. No jargon, no AI tool brand names, no promised numbers or savings. Tick "ai_automation" in the services whenever you list any.
 - Keep every field short: a sentence or two each. The pricing line is added separately; don't mention prices.
 - "subject" is a plain, specific subject line (under 60 characters) that names the business or something real about it.
-- "message" is only the opening of the email, one or two warm sentences that mention one specific, genuine thing about them (what they do, a theme in their reviews). No greeting and no sign-off (both are added for you), no hype, no "I hope this finds you well". The four parts are added after it, so don't repeat them.
+- "message" is only the opening of the email, one or two warm sentences that mention one specific, genuine thing about them (what they do, a theme in their reviews). No greeting and no sign-off (both are added for you), no hype, no "I hope this finds you well". The parts are added after it, so don't repeat them, and don't pitch services in it.
 - "unverified" lists anything ${OUTREACH.sender} should check before sending.`;
 
 export interface CaptureSummary {
@@ -260,6 +284,7 @@ export function buildDraftPrompt(input: ProspectInput, research: ResearchBundle,
       `Mentions reviews or testimonials: ${bool(f.mentionsReviews)}`,
       `Structured data (schema): ${f.schemaTypes.join(", ") || "none"}`,
       `Built with: ${f.platform ?? "unknown"}`,
+      `Chat / booking / CRM tools detected on the site: ${f.tools.join(", ") || "none"}`,
       `Mobile viewport tag: ${bool(f.hasViewportMeta)}`,
       `Copyright year in footer: ${f.copyrightYear ?? "none"}`,
       "",

@@ -132,6 +132,7 @@ const sheet = {
   problem: "p",
   solution: { custom_website: true, google_business_profile: false, local_seo: false, booking_quote_form: false, logo_branding: false },
   solution_note: "n",
+  automations: [{ idea: "Missed-call text-back", problem: "Calls probably go to voicemail on jobs.", how: "It texts callers back in seconds." }],
   free_value: { homepage_mockup: true, google_listing_fix: false, review_link_qr: false, site_audit: false },
   free_value_other: null,
 };
@@ -178,7 +179,7 @@ describe("processProspect", () => {
     expect(sent).toMatchObject({ to: "info@smithplumbing.com", subject: "A quick look at Smith" });
     // The opening, then the one-pager's four parts.
     expect(sent.text.startsWith("Hi Pat. Jake")).toBe(true);
-    for (const part of ["- Google listing: g", "What this may mean for your customers", "How I can help", "Free, no strings", 'reply "no thanks"']) expect(sent.text).toContain(part);
+    for (const part of ["- Google listing: g", "What this may mean for your customers", "How I can help", "A few AI automations", "- Missed-call text-back: Calls probably go to voicemail on jobs.", "Free, no strings", 'reply "no thanks"']) expect(sent.text).toContain(part);
     expect(Object.keys(sent)).toEqual(["to", "subject", "text"]);
     expect(row("p1")).toMatchObject({ status: "draft", draft_state: "created", gmail_draft_id: "draft-1", email: "info@smithplumbing.com", draft_error: null });
     expect(outcome.costUsd).toBe(0.05);

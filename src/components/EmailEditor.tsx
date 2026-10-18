@@ -111,7 +111,7 @@ export function EmailEditor({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-medium">The email</h2>
-          <p className="text-[13px] text-muted">Written in the four parts of your one-pager. Edit anything, then Save. Changes apply to the next Gmail draft you create.</p>
+          <p className="text-[13px] text-muted">Written in the parts of your one-pager, plus AI automation ideas. Edit anything, then Save. Changes apply to the next Gmail draft you create.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="btn min-h-10 px-4 text-[11.5px]" onClick={copy}>
@@ -170,7 +170,27 @@ export function EmailEditor({
           ))}
         </div>
         <AutoText label="How this fits the business" value={sheet.solution_note} onChange={(v) => edit({ solution_note: v })} />
-        <p className="text-xs text-muted">{OUTREACH.price} (added automatically)</p>
+        <p className="text-xs text-muted">{OUTREACH.price} (added automatically when a website, listing or SEO item is ticked)</p>
+      </Part>
+
+      <Part n="+" title="AI automation ideas">
+        <p className="text-xs text-muted">Specific to this business. These become bullets in the email. Remove any that don&apos;t fit.</p>
+        {sheet.automations.map((a, i) => {
+          const change = (next: Partial<typeof a>) => edit({ automations: sheet.automations.map((x, j) => (j === i ? { ...x, ...next } : x)) });
+          return (
+            <div key={i} className="flex flex-col gap-2 rounded-lg border border-line p-3.5">
+              <input aria-label={`Idea ${i + 1}`} value={a.idea} onChange={(e) => change({ idea: e.target.value })} className={`${inputClass} font-medium`} />
+              <AutoText label={`Idea ${i + 1}: the problem`} value={a.problem} onChange={(v) => change({ problem: v })} />
+              <AutoText label={`Idea ${i + 1}: what it would do`} value={a.how} onChange={(v) => change({ how: v })} />
+              <button type="button" className="btn btn-danger min-h-9 self-start px-3 text-[11px]" onClick={() => edit({ automations: sheet.automations.filter((_, j) => j !== i) })}>
+                Remove idea
+              </button>
+            </div>
+          );
+        })}
+        <button type="button" className="btn min-h-10 self-start px-4 text-[11.5px]" onClick={() => edit({ automations: [...sheet.automations, { idea: "", problem: "", how: "" }] })}>
+          Add an idea
+        </button>
       </Part>
 
       <Part n="04" title="Free value">
