@@ -4,8 +4,15 @@ import type { GeminiClient } from "./gemini";
 vi.mock("server-only", () => ({}));
 vi.mock("./visual", () => ({ captureSite: vi.fn(), launchBrowser: vi.fn() }));
 
-let gmail: { connected: boolean; allowed: boolean; email: string | null } = { connected: true, allowed: true, email: "jake@jtbuildsco.com" };
-vi.mock("./gmail", () => ({ gmailStatus: async () => gmail, createGmailDraft: vi.fn() }));
+let gmail = { configured: true, address: "jake@gmail.com" };
+let loginError: Error | null = null;
+vi.mock("./gmail", () => ({
+  gmailStatus: () => gmail,
+  checkGmailLogin: async () => {
+    if (loginError) throw loginError;
+  },
+  createGmailDraft: vi.fn(),
+}));
 
 // A small in-memory stand-in for the tables these functions use.
 type Row = Record<string, unknown>;
@@ -156,7 +163,8 @@ beforeEach(() => {
   tables.outreach_prospects = [prospect()];
   tables.outreach_searches = [];
   tables.outreach_runs = [];
-  gmail = { connected: true, allowed: true, email: "jake@jtbuildsco.com" };
+  gmail = { configured: true, address: "jake@gmail.com" };
+  loginError = null;
   nextId = 1;
 });
 
@@ -285,15 +293,25 @@ describe("discoverForSearch", () => {
 describe("runOutreachLoop", () => {
   const ok = { state: "created" as const, costUsd: 0.04 };
 
-  it("won't run until Gmail drafts are allowed", async () => {
-    gmail = { connected: true, allowed: false, email: null };
+  it("won't run until Gmail is set up", async () => {
+    gmail = { configured: false, address: null as never };
     const runOne = vi.fn();
     const result = await runOutreachLoop({ trigger: "manual", runOne });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/Reconnect Google/);
+    expect(result.error).toMatch(/GMAIL_ADDRESS and GMAIL_APP_PASSWORD/);
     expect(runOne).not.toHaveBeenCalled();
-    expect(tables.outreach_runs[0].error).toMatch(/Reconnect Google/);
+    expect(tables.outreach_runs[0].error).toMatch(/GMAIL_APP_PASSWORD/);
     expect(tables.outreach_runs[0].finished_at).toBeTruthy();
+  });
+
+  it("stops before searching or researching when the app password is rejected", async () => {
+    loginError = new Error("Gmail rejected the address or app password.");
+    const runOne = vi.fn();
+    const client = discoveryClient([]);
+    const result = await runOutreachLoop({ trigger: "cron", runOne, client });
+    expect(result).toMatchObject({ ok: false, error: "Gmail rejected the address or app password." });
+    expect(runOne).not.toHaveBeenCalled();
+    expect(client.search).not.toHaveBeenCalled();
   });
 
   it("handles the queue first, then tops up from saved searches, and logs the run", async () => {

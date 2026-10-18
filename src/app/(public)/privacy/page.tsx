@@ -44,10 +44,9 @@ export default function PrivacyPolicy() {
       <Section title="Information we collect">
         <p>
           <strong className="font-medium text-ink">From Google, with permission.</strong> When a Google account is connected,
-          the tool asks Google for read-only access to Search Console (the <code>webmasters.readonly</code> scope), permission to
-          create draft emails in the account&apos;s Gmail (the <code>gmail.compose</code> scope), and the account&apos;s email
-          address (<code>openid</code> and <code>email</code>). With the Search Console permission, it reads, for the
-          properties the account can already see:
+          the tool asks Google for read-only access to Search Console (the <code>webmasters.readonly</code> scope) plus the
+          account&apos;s email address (<code>openid</code> and <code>email</code>). With that, it reads, for the Search
+          Console properties the account can already see:
         </p>
         <ul>
           <li>
@@ -62,11 +61,12 @@ export default function PrivacyPolicy() {
           any other Google data.
         </p>
         <p>
-          <strong className="font-medium text-ink">Gmail drafts.</strong> The Gmail permission is used only to save draft
-          outreach emails in the connected account&apos;s Drafts folder. {OPERATOR.name}{" "}
-          reads each draft and decides whether to send it from Gmail. Google&apos;s <code>gmail.compose</code> permission also
-          technically allows sending, but the tool is built never to send email and never does. The drafts are addressed to
-          business contact addresses published on those businesses&apos; own websites.
+          <strong className="font-medium text-ink">Gmail drafts.</strong> This isn&apos;t a Google sign-in permission granted by
+          clients or other people. {OPERATOR.name} gives the tool the sign-in details (an app password) for {OPERATOR.name}&apos;s own
+          Gmail account, which it uses only to save draft outreach emails in that account&apos;s Drafts folder.{" "}
+          {OPERATOR.name} reads each draft and decides whether to send it from Gmail. The tool is built to only add drafts: it
+          never reads, searches or deletes mail and never sends any. The drafts are addressed to business contact
+          addresses published on those businesses&apos; own websites.
         </p>
         <p>
           <strong className="font-medium text-ink">From public websites.</strong> The tool crawls the public pages of the
@@ -89,7 +89,7 @@ export default function PrivacyPolicy() {
           <li>To report on how each site performs in Google Search, for us and for that site&apos;s owner.</li>
           <li>To find problems on a site&apos;s pages and recommend specific improvements.</li>
           <li>To measure whether a change made to a site improved its search performance.</li>
-          <li>To save draft emails to prospective clients in the connected Gmail account, for review before anything is sent.</li>
+          <li>To save draft emails to prospective clients in the operator&apos;s own Gmail, for review before anything is sent.</li>
         </ul>
         <p>
           We don&apos;t sell this information, use it for advertising, or share it with anyone except the processors listed

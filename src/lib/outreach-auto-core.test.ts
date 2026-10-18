@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   blockedHost,
-  buildRawEmail,
+  buildMessage,
   pickEmail,
   siteMatchesBusiness,
   toCandidates,
@@ -84,32 +84,38 @@ describe("pickEmail", () => {
   });
 });
 
-describe("buildRawEmail", () => {
-  const decode = (raw: string) => Buffer.from(raw, "base64url").toString("utf8");
-  const raw = buildRawEmail({ to: "info@smithplumbing.com", subject: "A quick look at Smith – plumbing", text: "Hi Pat — thanks.\nJake" });
-  const mime = decode(raw);
+describe("buildMessage", () => {
+  const date = new Date("2026-10-18T14:00:00Z");
+  const raw = buildMessage({ from: "jake@gmail.com", to: "info@smithplumbing.com", subject: "A quick look at Smith – plumbing", text: "Hi Pat — thanks.\nJake", date, messageId: "abc@gmail.com" });
 
-  it("is a plain-text message with the right headers and no attachment", () => {
-    expect(mime).toContain("To: info@smithplumbing.com\r\n");
-    expect(mime).toContain("MIME-Version: 1.0");
-    expect(mime).toContain("Content-Type: text/plain; charset=UTF-8");
-    expect(mime).not.toMatch(/multipart|attachment|application\/pdf/i);
-    expect(mime).not.toMatch(/^From:/m);
+  it("is a plain-text RFC 822 message with CRLF line endings and no attachment", () => {
+    expect(raw).toContain("From: jake@gmail.com\r\n");
+    expect(raw).toContain("To: info@smithplumbing.com\r\n");
+    expect(raw).toContain("Date: Sun, 18 Oct 2026 14:00:00 +0000\r\n");
+    expect(raw).toContain("Message-ID: <abc@gmail.com>\r\n");
+    expect(raw).toContain("MIME-Version: 1.0");
+    expect(raw).toContain("Content-Type: text/plain; charset=UTF-8");
+    expect(raw).not.toMatch(/multipart|attachment|application\/pdf/i);
+    expect(raw.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
   });
 
   it("encodes a non-ASCII subject and body so they survive", () => {
-    const subject = mime.match(/^Subject: =\?UTF-8\?B\?(.+)\?=$/m)![1];
+    const subject = raw.match(/^Subject: =\?UTF-8\?B\?(.+)\?=\r$/m)![1];
     expect(Buffer.from(subject, "base64").toString("utf8")).toBe("A quick look at Smith – plumbing");
-    const body = mime.split("\r\n\r\n")[1].replace(/\r\n/g, "");
+    const body = raw.split("\r\n\r\n")[1].replace(/\r\n/g, "");
     expect(Buffer.from(body, "base64").toString("utf8")).toBe("Hi Pat — thanks.\nJake");
   });
 
-  it("keeps an ASCII subject readable", () => {
-    expect(decode(buildRawEmail({ to: "a@b.example", subject: "Hello there", text: "x" }))).toContain("Subject: Hello there\r\n");
+  it("keeps an ASCII subject readable and makes its own Message-ID", () => {
+    const plain = buildMessage({ from: "jake@gmail.com", to: "a@b.example", subject: "Hello there", text: "x" });
+    expect(plain).toContain("Subject: Hello there\r\n");
+    expect(plain).toMatch(/Message-ID: <[\w.]+@gmail\.com>/);
   });
 
   it("refuses line breaks in headers", () => {
-    expect(() => buildRawEmail({ to: "a@b.example\r\nBcc: x@y.example", subject: "s", text: "t" })).toThrow(/line breaks/);
-    expect(() => buildRawEmail({ to: "a@b.example", subject: "s\nBcc: x@y.example", text: "t" })).toThrow(/line breaks/);
+    const ok = { from: "jake@gmail.com", to: "a@b.example", subject: "s", text: "t" };
+    expect(() => buildMessage({ ...ok, to: "a@b.example\r\nBcc: x@y.example" })).toThrow(/line breaks/);
+    expect(() => buildMessage({ ...ok, subject: "s\nBcc: x@y.example" })).toThrow(/line breaks/);
+    expect(() => buildMessage({ ...ok, from: "x@y.example\nBcc: z@y.example" })).toThrow(/line breaks/);
   });
 });

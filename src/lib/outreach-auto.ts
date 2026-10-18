@@ -1,6 +1,6 @@
 import "server-only";
 import { BLUEPRINT_MODEL, addUsage, usageCost, type Usage } from "./blueprint-prompt";
-import { createGmailDraft, gmailStatus } from "./gmail";
+import { checkGmailLogin, createGmailDraft, gmailStatus } from "./gmail";
 import { describeAiError, geminiFromEnv, type GeminiClient } from "./gemini";
 import {
   buildDiscoverySearchPrompt,
@@ -222,7 +222,7 @@ export interface LoopResult {
   costUsd: number;
 }
 
-// One run: needs Gmail permission; tops the queue up from the saved searches; processes the
+// One run: needs Gmail set up; tops the queue up from the saved searches; processes the
 // queue. Safe to call repeatedly: finished businesses are never done twice.
 export async function runOutreachLoop(options: LoopOptions): Promise<LoopResult> {
   const result: LoopResult = { ok: false, found: 0, drafted: 0, noEmail: 0, skipped: 0, failed: 0, costUsd: 0 };
@@ -231,9 +231,9 @@ export async function runOutreachLoop(options: LoopOptions): Promise<LoopResult>
 
   let usage = usageCost(0, 0);
   try {
-    const gmail = await gmailStatus();
-    if (!gmail.connected) throw new Error("Google isn't connected.");
-    if (!gmail.allowed) throw new Error("Google hasn't allowed Gmail drafts yet. Reconnect Google on the Connections page and tick the Gmail box.");
+    // Before spending anything: is Gmail set up, and does the app password work?
+    if (!gmailStatus().configured) throw new Error("Gmail isn't set up yet: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD in Vercel.");
+    await checkGmailLogin();
 
     const { data: queued, error } = await db()
       .from("outreach_prospects")

@@ -305,11 +305,13 @@ Set up once under **Outreach → Automatic outreach**, then it runs by itself:
 - The email body ends with your signature and a "reply no thanks" opt-out line. Set **`OUTREACH_POSTAL_ADDRESS`**
   to add a postal address to it (US commercial email law asks for one).
 
-**Needs the `gmail.compose` Google permission.** Enable the Gmail API in the Cloud project, add the scope under
-Data Access, then reconnect Google on the Connections page and tick the Gmail box. Google has no drafts-only
-permission, so this scope also allows sending; the tool never sends, and `gmail.test.ts` fails if any code
-calls a send endpoint or any Gmail URL other than drafts. Drafts land in the connected Google account's Gmail, so
-connect the account you want them in.
+**Needs `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD`.** The tool saves drafts over IMAP (`src/lib/gmail.ts`)
+using a Gmail **app password** (myaccount.google.com/apppasswords; needs 2-Step Verification), so there is no
+Google OAuth scope to get approved. Drafts land in that account's Drafts folder. An app password can do more than
+drafts, so treat it like a password (revoke it at the same page any time). The code only uses IMAP `LIST` (to
+find the Drafts folder) and `APPEND` (to add a draft), never reads mail and has no SMTP; `gmail.test.ts` fails
+if any code reads a mailbox, sends mail or imports a mail-sending library. Each run first checks that the login
+works and stops with a clear message if not.
 
 ## Results (attribution)
 

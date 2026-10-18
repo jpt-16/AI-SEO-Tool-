@@ -127,12 +127,18 @@ const encodeHeader = (value: string) => (/^[\x20-\x7e]*$/.test(value) ? value : 
 
 const wrap76 = (b64: string) => b64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
 
-// A plain-text email as the raw message Gmail's drafts API takes (base64url).
-export function buildRawEmail(input: { to: string; subject: string; text: string }): string {
-  if (/[\r\n]/.test(input.to) || /[\r\n]/.test(input.subject)) throw new Error("Email headers can't contain line breaks.");
+// A plain-text email as an RFC 822 message, ready to be saved as a draft.
+export function buildMessage(input: { from: string; to: string; subject: string; text: string; date?: Date; messageId?: string }): string {
+  for (const value of [input.from, input.to, input.subject]) {
+    if (/[\r\n]/.test(value)) throw new Error("Email headers can't contain line breaks.");
+  }
+  const domain = input.from.split("@")[1] ?? "localhost";
   const lines = [
+    `From: ${input.from}`,
     `To: ${input.to}`,
     `Subject: ${encodeHeader(input.subject)}`,
+    `Date: ${(input.date ?? new Date()).toUTCString().replace("GMT", "+0000")}`,
+    `Message-ID: <${input.messageId ?? `${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${domain}`}>`,
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
     "Content-Transfer-Encoding: base64",
@@ -140,5 +146,5 @@ export function buildRawEmail(input: { to: string; subject: string; text: string
     wrap76(Buffer.from(input.text, "utf8").toString("base64")),
     "",
   ];
-  return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
+  return lines.join("\r\n");
 }

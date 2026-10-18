@@ -1,18 +1,31 @@
 import "server-only";
-import { buildRawEmail } from "./outreach-auto-core";
-import { describeGoogleError, getConnection, GMAIL_SCOPE, gscRequester } from "./google";
+import { ImapFlow } from "imapflow";
+import { buildMessage } from "./outreach-auto-core";
 
-// Creates drafts in the connected account's Gmail. GMAIL_SCOPE also allows sending, but nothing
-// in this tool calls a send endpoint, and a test checks that.
-const DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts";
+// Saves draft emails into the operator's own Gmail over IMAP, signed in with an app password
+// (Google account → Security → 2-Step Verification → App passwords). That needs no Google
+// OAuth approval. An app password can do more than drafts, so this module only ever calls two
+// IMAP commands, LIST (to find the Drafts folder) and APPEND (to add a draft). It never reads
+// mail and never sends it (no SMTP at all); a test enforces both.
+const HOST = "imap.gmail.com";
+const FALLBACK_DRAFTS_FOLDER = "[Gmail]/Drafts";
 
-export async function gmailStatus(): Promise<{ connected: boolean; allowed: boolean; email: string | null }> {
-  const connection = await getConnection();
-  if (!connection) return { connected: false, allowed: false, email: null };
-  return { connected: true, allowed: connection.scope.split(" ").includes(GMAIL_SCOPE), email: connection.google_email };
+export interface GmailConfig {
+  address: string;
+  password: string;
 }
 
-type Requester = (opts: { url: string; method: "POST"; data: unknown }) => Promise<{ data: unknown }>;
+export function gmailConfig(env: Record<string, string | undefined> = process.env): GmailConfig | null {
+  const address = env.GMAIL_ADDRESS?.trim();
+  // Google shows app passwords as four groups of four letters with spaces.
+  const password = env.GMAIL_APP_PASSWORD?.replace(/\s+/g, "");
+  return address && password ? { address, password } : null;
+}
+
+export function gmailStatus(env: Record<string, string | undefined> = process.env): { configured: boolean; address: string | null } {
+  const config = gmailConfig(env);
+  return { configured: Boolean(config), address: config?.address ?? null };
+}
 
 export interface DraftInput {
   to: string;
@@ -20,19 +33,56 @@ export interface DraftInput {
   text: string;
 }
 
-export async function createGmailDraft(input: DraftInput, request?: Requester): Promise<{ id: string }> {
-  const send = request ?? ((await gscRequester()) as Requester | null);
-  if (!send) throw new Error("Connect Google first.");
+type ImapLike = Pick<ImapFlow, "connect" | "list" | "append" | "logout">;
+export type ImapFactory = (config: GmailConfig) => ImapLike;
+
+const defaultFactory: ImapFactory = (config) =>
+  new ImapFlow({ host: HOST, port: 993, secure: true, auth: { user: config.address, pass: config.password }, logger: false });
+
+export function describeGmailError(err: unknown): string {
+  const e = err as { authenticationFailed?: boolean; responseText?: string; response?: string; message?: string; code?: string };
+  if (e?.authenticationFailed) {
+    return "Gmail rejected the address or app password. Check GMAIL_ADDRESS and GMAIL_APP_PASSWORD in Vercel (the app password, not your normal password).";
+  }
+  if (e?.code === "ENOTFOUND" || e?.code === "ETIMEDOUT" || e?.code === "ECONNRESET") return `Couldn't reach Gmail (${e.code}). Try again.`;
+  const detail = e?.responseText || e?.response || e?.message;
+  return `Gmail error: ${detail ?? "unknown"}`;
+}
+
+// Fails fast, with a plain message, when the address or app password is wrong.
+export async function checkGmailLogin(factory: ImapFactory = defaultFactory, env: Record<string, string | undefined> = process.env): Promise<void> {
+  const config = gmailConfig(env);
+  if (!config) throw new Error("Gmail isn't set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD in Vercel.");
+  const client = factory(config);
   try {
-    const { data } = await send({ url: DRAFTS_URL, method: "POST", data: { message: { raw: buildRawEmail(input) } } });
-    const id = (data as { id?: string }).id;
-    if (!id) throw new Error("Gmail didn't return a draft id.");
-    return { id };
+    await client.connect();
   } catch (err) {
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    if (status === 403 && /insufficient|scope/i.test(describeGoogleError(err))) {
-      throw new Error("Google hasn't allowed Gmail drafts yet. Reconnect Google and tick the Gmail box.");
-    }
-    throw new Error(describeGoogleError(err));
+    throw new Error(describeGmailError(err));
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+// Adds one draft to the Drafts folder. Returns an id for it, if Gmail reports one.
+export async function createGmailDraft(
+  input: DraftInput,
+  factory: ImapFactory = defaultFactory,
+  env: Record<string, string | undefined> = process.env,
+): Promise<{ id: string }> {
+  const config = gmailConfig(env);
+  if (!config) throw new Error("Gmail isn't set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD in Vercel.");
+  const raw = buildMessage({ from: config.address, to: input.to, subject: input.subject, text: input.text });
+  const client = factory(config);
+  try {
+    await client.connect();
+    const folders = await client.list();
+    const drafts = folders.find((f) => f.specialUse === "\\Drafts")?.path ?? FALLBACK_DRAFTS_FOLDER;
+    const result = await client.append(drafts, raw, ["\\Draft"]);
+    if (!result) throw new Error("Gmail didn't accept the draft.");
+    return { id: result.uid !== undefined ? `${result.uidValidity ?? ""}:${result.uid}` : result.destination };
+  } catch (err) {
+    throw new Error(describeGmailError(err));
+  } finally {
+    await client.logout().catch(() => {});
   }
 }

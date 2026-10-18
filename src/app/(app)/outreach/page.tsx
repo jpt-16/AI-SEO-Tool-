@@ -19,7 +19,8 @@ function draftBadge(p: Prospect): { label: string; tone: string } | null {
 }
 
 export default async function OutreachPage() {
-  const [prospects, searches, runs, gmail] = await Promise.all([listProspects(), listSearches(), listRuns(), gmailStatus()]);
+  const [prospects, searches, runs] = await Promise.all([listProspects(), listSearches(), listRuns()]);
+  const gmail = gmailStatus();
   return (
     <>
       <header className="flex flex-col gap-3.5">
@@ -43,18 +44,17 @@ export default async function OutreachPage() {
           </p>
         </div>
 
-        <p role="status" className={`text-[13px] ${gmail.allowed ? "text-accent-300" : "text-danger"}`}>
-          {!gmail.connected ? (
-            <>Google isn&apos;t connected. <Link href="/connect">Connect Google</Link> first.</>
-          ) : gmail.allowed ? (
+        <p role="status" className={`text-[13px] leading-relaxed ${gmail.configured ? "text-accent-300" : "text-danger"}`}>
+          {gmail.configured ? (
             <>
-              Drafts go to {gmail.email ?? "the connected Google account"}&apos;s Gmail.{" "}
+              Drafts go to {gmail.address}.{" "}
               <a href="https://mail.google.com/mail/#drafts" target="_blank" rel="noreferrer">Open Gmail drafts</a>
             </>
           ) : (
             <>
-              Gmail drafts aren&apos;t allowed yet, so nothing runs. <a href="/api/auth/google/start">Reconnect Google</a> and tick the Gmail
-              box on Google&apos;s screen.
+              Gmail isn&apos;t set up, so nothing runs. In Vercel, add <code>GMAIL_ADDRESS</code> (your Gmail address) and{" "}
+              <code>GMAIL_APP_PASSWORD</code> (create one at myaccount.google.com/apppasswords, which needs 2-Step Verification
+              on), then redeploy.
             </>
           )}
         </p>

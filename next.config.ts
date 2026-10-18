@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
   // Loaded from node_modules at runtime rather than bundled.
-  serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
+  serverExternalPackages: ["playwright-core", "@sparticuz/chromium", "imapflow"],
   // Both packages read files from disk at runtime (the Chromium binary, playwright's
   // browsers.json), which tracing can't see, so ship them whole.
   outputFileTracingIncludes: Object.fromEntries(
