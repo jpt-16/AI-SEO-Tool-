@@ -134,6 +134,7 @@ const draft = {
   solution_note: "A listing plus a tap-to-call button would put you in front of nearby customers.",
   free_value: { homepage_mockup: false, google_listing_fix: true, review_link_qr: true, site_audit: false },
   free_value_other: null,
+  subject: "A quick look at Smith & Sons online",
   message: "Hi Pat, I took a quick look at Smith & Sons online and made you a one-page summary. Jake",
   unverified: ["Check there's really no Google listing."],
 };
@@ -142,6 +143,7 @@ describe("one-pager", () => {
   it("accepts a full draft and keeps only the sheet's fields", () => {
     const sheet = sheetFromDraft(OnePagerOutput.parse(draft));
     expect(Object.keys(sheet)).not.toContain("message");
+    expect(Object.keys(sheet)).not.toContain("subject");
     expect(Object.keys(sheet)).not.toContain("unverified");
     expect(OnePagerSheet.safeParse(sheet).success).toBe(true);
   });

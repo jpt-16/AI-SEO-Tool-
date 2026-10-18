@@ -283,6 +283,31 @@ Prospects are stored in `outreach_prospects` with a status (draft, sent, replied
 Cost is shown per prospect (draft plus search tokens). Google may also bill a per-search fee for Gemini's
 Google Search grounding; that isn't included, and you can untick the search on the form.
 
+### Automatic outreach (finds businesses and fills your Gmail drafts)
+
+Set up once under **Outreach → Automatic outreach**, then it runs by itself:
+
+- **Saved searches** ("plumbers" in "Foxboro, MA"). Each daily run (`/api/cron/outreach`, 14:00 UTC, about 10am
+  Eastern) first handles any queued businesses, then, if there's room, asks Gemini (with Google Search) for new
+  independent local businesses from the oldest-used searches, dropping directories, chains, duplicates (by
+  website host) and anything without a website (`toCandidates()` in `src/lib/outreach-auto-core.ts`).
+- Up to **`OUTREACH_PER_RUN`** (default 6, max 12) businesses per run. Each is handled in its **own function
+  call** (`?prospectId=`, up to 5 minutes each), like the weekly crawl does per site.
+- Per business, cheapest checks first: read their site; skip it if it doesn't look like that business or has
+  **no email address** (`pickEmail()` prefers a general inbox on their own domain); only then research, draft and
+  render the sheet to a one-page **PDF** (headless Chromium, `src/lib/outreach-html.ts`), and create the **Gmail
+  draft** (message in the body, PDF attached) via `users.drafts.create`.
+- Each run is logged (found / drafted / no email / skipped / failed / cost) on the Outreach page. **Run now**
+  does the same by hand. A business whose research fails is retried once the next day, then dropped.
+- The email body ends with your signature and a "reply no thanks" opt-out line. Set **`OUTREACH_POSTAL_ADDRESS`**
+  to add a postal address to it (US commercial email law asks for one).
+
+**Needs the `gmail.compose` Google permission.** Enable the Gmail API in the Cloud project, add the scope under
+Data Access, then reconnect Google on the Connections page and tick the Gmail box. Google has no drafts-only
+permission, so this scope also allows sending; the tool never sends, and `gmail.test.ts` fails if any code
+calls a send endpoint or any Gmail URL other than drafts. Drafts land in the connected Google account's Gmail, so
+connect the account you want them in.
+
 ## Results (attribution)
 
 `src/lib/attribution.ts` measures whether a finished blueprint moved anything:

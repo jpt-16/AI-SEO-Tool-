@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OnePagerEditor } from "@/components/OnePagerEditor";
+import { DraftToGmailForm } from "@/components/OutreachAuto";
 import { ResearchAgainForm } from "@/components/OutreachForm";
 import { formatDateTime } from "@/lib/format";
 import { getProspect, PROSPECT_STATUSES, STATUS_LABEL, type Prospect } from "@/lib/outreach";
+import { pickEmail } from "@/lib/outreach-auto-core";
 import { formatToday } from "@/lib/outreach-sheet";
 import { deleteProspect, setProspectStatus } from "../../actions";
 
@@ -135,6 +137,10 @@ export default async function ProspectPage({ params }: PageProps<"/outreach/[id]
         </div>
       </header>
 
+      {prospect.skip_reason && (
+        <p className="panel p-5 text-sm leading-relaxed text-muted sm:p-6">Skipped by the automatic run: {prospect.skip_reason}</p>
+      )}
+
       {prospect.research_error && (
         <p role="alert" className="panel border-danger-line p-5 text-sm leading-relaxed text-danger sm:p-6">
           The draft failed: {prospect.research_error}
@@ -162,6 +168,26 @@ export default async function ProspectPage({ params }: PageProps<"/outreach/[id]
           initialSheet={prospect.one_pager}
           initialMessage={prospect.message}
         />
+      )}
+
+      {prospect.one_pager && (
+        <section aria-label="Gmail draft" className="panel flex flex-col gap-3 p-5 sm:p-7">
+          <h2 className="text-lg font-medium">Gmail draft</h2>
+          <p className="text-[13.5px] text-soft">
+            {prospect.draft_state === "created"
+              ? `In Gmail since ${formatDateTime(prospect.drafted_at ?? prospect.created_at)}, addressed to ${prospect.email}.`
+              : prospect.draft_state === "failed"
+                ? `The draft failed: ${prospect.draft_error}`
+                : prospect.draft_state === "no_email"
+                  ? "No email address was found on their site. Enter one below."
+                  : "Not in Gmail yet."}
+          </p>
+          <DraftToGmailForm
+            id={prospect.id}
+            defaultTo={prospect.email ?? pickEmail(prospect.research?.facts?.emails ?? [], prospect.website) ?? ""}
+            created={prospect.draft_state === "created"}
+          />
+        </section>
       )}
 
       <Research prospect={prospect} />

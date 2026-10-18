@@ -6,8 +6,11 @@ import type { GscRequester } from "./gsc";
 import { db } from "./supabase";
 
 export const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+// Lets the Outreach feature create drafts in Gmail. Google has no drafts-only permission, so this
+// scope also allows sending; the tool never sends (a test enforces it).
+export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.compose";
 // openid + email only identify which Google account is connected.
-export const OAUTH_SCOPES = ["openid", "email", GSC_SCOPE];
+export const OAUTH_SCOPES = ["openid", "email", GSC_SCOPE, GMAIL_SCOPE];
 export const OAUTH_STATE_COOKIE = "gsc_oauth_state";
 
 export function oauthClient(): OAuth2Client {

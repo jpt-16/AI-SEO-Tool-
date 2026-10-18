@@ -202,6 +202,7 @@ Rules:
 - "Their problem" explains, in plain words, what the findings may mean for their customers (for example, someone searching on a phone can't tap to call). Hedge with "may" or "could". No SEO jargon, no scare tactics, no invented statistics.
 - Tick only the services that address something in the research, and only the free offers that fit (a business with no Google listing gets "Free Google listing fix"; one with an outdated site gets "Free homepage mockup"; one with happy customers and few reviews gets the review link + QR code; "Free 1-page site audit" fits almost anyone with a site).
 - Keep every field short: the sheet has small boxes. The pricing line is printed separately; don't mention prices.
+- "subject" is a plain, specific subject line (under 60 characters) that names the business or something real about it.
 - "message" is a few warm sentences that go with the sheet, mention one specific thing about them, and end with "${OUTREACH.sender}". No subject line, no hype, no "I hope this finds you well".
 - "unverified" lists anything ${OUTREACH.sender} should check before sending.`;
 

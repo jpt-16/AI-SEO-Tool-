@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // Routes that can run a crawl, which launches headless Chromium for visual scoring.
-const CRAWL_ROUTES = ["/api/crawl", "/api/cron/crawl", "/performance", "/blueprints", "/audit", "/outreach", "/outreach/[id]"];
+const CRAWL_ROUTES = ["/api/crawl", "/api/cron/crawl", "/performance", "/blueprints", "/audit", "/outreach", "/outreach/[id]", "/api/cron/outreach"];
 
 const SECURITY_HEADERS = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },

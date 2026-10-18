@@ -42,6 +42,7 @@ export const OnePagerOutput = z.object({
   solution_note: z.string().describe("Section 03 note: one or two sentences, around 160 characters, saying how those services fit this business."),
   free_value: flags(FREE_VALUE_ITEMS.map((i) => i.key)).describe("Tick the one to three free offers that best fit this business."),
   free_value_other: z.string().nullable().describe("Optional extra free offer, a few words, or null."),
+  subject: z.string().describe("Email subject line: specific to this business, under 60 characters, plain, no hype, no clickbait, no ALL CAPS."),
   message: z.string().describe("The short note sent with the sheet: 3 to 5 sentences, first person as the sender, no subject line, ends with the sender's first name."),
   unverified: z.array(z.string()).describe("Things the sender should double-check before sending: anything uncertain, inferred, or from a single weak source. Empty if everything is solid."),
 });
@@ -49,7 +50,7 @@ export const OnePagerOutput = z.object({
 export type OnePagerDraft = z.infer<typeof OnePagerOutput>;
 
 // The sheet as printed and edited (the draft minus the notes that aren't on it).
-export const OnePagerSheet = OnePagerOutput.omit({ message: true, unverified: true });
+export const OnePagerSheet = OnePagerOutput.omit({ subject: true, message: true, unverified: true });
 export type OnePagerSheetData = z.infer<typeof OnePagerSheet>;
 
 export const sheetFromDraft = (d: OnePagerDraft): OnePagerSheetData => OnePagerSheet.parse(d);

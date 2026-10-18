@@ -53,6 +53,7 @@ const draft = {
   solution_note: "A listing and tap-to-call.",
   free_value: { homepage_mockup: true, google_listing_fix: true, review_link_qr: false, site_audit: false },
   free_value_other: null,
+  subject: "A quick look at Smith Plumbing online",
   message: "Hi Pat. Jake",
   unverified: ["Confirm there's no listing."],
 };

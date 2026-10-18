@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ISSUE_TYPES } from "@/lib/audit";
 import { markBlueprintDone } from "@/lib/attribution";
@@ -13,6 +13,7 @@ import { requireEnv } from "@/lib/env";
 import { isPublicHostname, normalizeWebsite } from "@/lib/outreach-core";
 import { OnePagerSheet } from "@/lib/outreach-sheet";
 import { PROSPECT_STATUSES, researchProspect } from "@/lib/outreach";
+import { draftProspect, remoteRunner, runOutreachLoop } from "@/lib/outreach-auto";
 import { describeGoogleError, getConnection, gscRequester, oauthClient } from "@/lib/google";
 import { listSites as listGscProperties } from "@/lib/gsc";
 import { SITE_COOKIE } from "@/lib/sites";
@@ -238,4 +239,61 @@ export async function deleteProspect(formData: FormData) {
   if (error) throw error;
   revalidatePath("/outreach");
   redirect("/outreach");
+}
+
+// ---- Automatic outreach ----
+
+export async function addSearch(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
+  const trade = clean(formData.get("trade"))?.toLowerCase();
+  const town = clean(formData.get("town"));
+  if (!trade || !town) return { ok: false, message: "Enter a trade and a town." };
+  const { error } = await db().from("outreach_searches").insert({ trade, town });
+  if (error) return { ok: false, message: error.code === "23505" ? "That search is already saved." : error.message };
+  revalidatePath("/outreach");
+  return { ok: true, message: `Saved: ${trade} in ${town}.` };
+}
+
+export async function setSearchEnabled(formData: FormData) {
+  const { error } = await db()
+    .from("outreach_searches")
+    .update({ enabled: formData.get("enabled") === "true" })
+    .eq("id", String(formData.get("id") ?? ""));
+  if (error) throw error;
+  revalidatePath("/outreach");
+}
+
+export async function deleteSearch(formData: FormData) {
+  const { error } = await db().from("outreach_searches").delete().eq("id", String(formData.get("id") ?? ""));
+  if (error) throw error;
+  revalidatePath("/outreach");
+}
+
+// The same run the daily job does, started by hand.
+export async function runOutreachNow(): Promise<ActionState> {
+  const secret = requireEnv("CRON_SECRET");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return { ok: false, message: "Couldn't work out this site's address." };
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const result = await runOutreachLoop({ trigger: "manual", runOne: remoteRunner(`${proto}://${host}`, `Bearer ${secret}`) });
+  revalidatePath("/outreach");
+  if (!result.ok) return { ok: false, message: result.error ?? "The run failed." };
+  const parts = [`${result.found} new businesses found`, `${result.drafted} drafts in Gmail`];
+  if (result.noEmail) parts.push(`${result.noEmail} had no email address`);
+  if (result.skipped) parts.push(`${result.skipped} skipped`);
+  if (result.failed) parts.push(`${result.failed} failed`);
+  parts.push(`cost $${result.costUsd.toFixed(2)}`);
+  return { ok: !result.error, message: `${parts.join(" · ")}.${result.error ? ` ${result.error}` : ""}` };
+}
+
+// Puts one prospect's sheet into Gmail as a draft (never sends it).
+export async function createDraftFor(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
+  const id = String(formData.get("id") ?? "");
+  const to = clean(formData.get("to"));
+  if (to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return { ok: false, message: "That doesn't look like an email address." };
+  const outcome = await draftProspect(id, { to: to ?? undefined });
+  revalidatePath(`/outreach/${id}`);
+  revalidatePath("/outreach");
+  if (outcome.state === "created") return { ok: true, message: "Draft created in Gmail." };
+  return { ok: false, message: outcome.reason ?? "Couldn't create the draft." };
 }

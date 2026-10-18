@@ -24,9 +24,10 @@ const FETCH_TIMEOUT_MS = 15_000;
 const MAX_HTML_CHARS = 2_000_000;
 const CAPTURE_BUDGET_MS = 90_000;
 
-export type ProspectStatus = "draft" | "sent" | "replied" | "passed";
+export type ProspectStatus = "queued" | "draft" | "sent" | "replied" | "passed";
 export const PROSPECT_STATUSES: ProspectStatus[] = ["draft", "sent", "replied", "passed"];
-export const STATUS_LABEL: Record<ProspectStatus, string> = { draft: "Draft", sent: "Sent", replied: "Replied", passed: "Passed" };
+export const STATUS_LABEL: Record<ProspectStatus, string> = { queued: "Queued", draft: "Draft", sent: "Sent", replied: "Replied", passed: "Passed" };
+export type DraftState = "none" | "created" | "no_email" | "failed" | "skipped";
 
 export interface Prospect {
   id: string;
@@ -40,7 +41,17 @@ export interface Prospect {
   research: ResearchBundle | null;
   one_pager: OnePagerSheetData | null;
   message: string | null;
+  subject: string | null;
   unverified: string[] | null;
+  email: string | null;
+  source: "manual" | "auto";
+  search_id: string | null;
+  attempts: number;
+  draft_state: DraftState;
+  gmail_draft_id: string | null;
+  drafted_at: string | null;
+  draft_error: string | null;
+  skip_reason: string | null;
   model: string | null;
   cost_usd: number | null;
   researched_at: string | null;
@@ -48,7 +59,7 @@ export interface Prospect {
 }
 
 const COLUMNS =
-  "id, created_at, business_name, website, owner_name, city, notes, status, research, one_pager, message, unverified, model, cost_usd, researched_at, research_error";
+  "id, created_at, business_name, website, owner_name, city, notes, status, research, one_pager, message, subject, unverified, email, source, search_id, attempts, draft_state, gmail_draft_id, drafted_at, draft_error, skip_reason, model, cost_usd, researched_at, research_error";
 
 export async function listProspects(): Promise<Prospect[]> {
   const { data, error } = await db().from("outreach_prospects").select(COLUMNS).order("created_at", { ascending: false }).limit(200);
@@ -195,11 +206,14 @@ export async function researchProspect(id: string, options: ResearchOptions = {}
         research,
         one_pager: sheet,
         message: draft.parsed.message,
+        subject: draft.parsed.subject,
         unverified: draft.parsed.unverified,
         model: BLUEPRINT_MODEL,
         cost_usd: result.usage.costUsd,
         researched_at: new Date().toISOString(),
         research_error: null,
+        // A redraft starts the email over: the old Gmail draft stays in Gmail.
+        status: prospect.status === "queued" ? "draft" : prospect.status,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
