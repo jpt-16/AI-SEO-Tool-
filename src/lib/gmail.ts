@@ -11,20 +11,24 @@ const HOST = "imap.gmail.com";
 const FALLBACK_DRAFTS_FOLDER = "[Gmail]/Drafts";
 
 export interface GmailConfig {
+  // The account the app password belongs to: where drafts are saved.
   address: string;
   password: string;
+  // The "From" shown on each draft. Defaults to the account's own address; set OUTREACH_FROM to
+  // one of its aliases (say jake@jtbuildsco.com on a Workspace account) to send as that instead.
+  from: string;
 }
 
 export function gmailConfig(env: Record<string, string | undefined> = process.env): GmailConfig | null {
   const address = env.GMAIL_ADDRESS?.trim();
   // Google shows app passwords as four groups of four letters with spaces.
   const password = env.GMAIL_APP_PASSWORD?.replace(/\s+/g, "");
-  return address && password ? { address, password } : null;
+  return address && password ? { address, password, from: env.OUTREACH_FROM?.trim() || address } : null;
 }
 
-export function gmailStatus(env: Record<string, string | undefined> = process.env): { configured: boolean; address: string | null } {
+export function gmailStatus(env: Record<string, string | undefined> = process.env): { configured: boolean; address: string | null; from: string | null } {
   const config = gmailConfig(env);
-  return { configured: Boolean(config), address: config?.address ?? null };
+  return { configured: Boolean(config), address: config?.address ?? null, from: config?.from ?? null };
 }
 
 export interface DraftInput {
@@ -71,7 +75,7 @@ export async function createGmailDraft(
 ): Promise<{ id: string }> {
   const config = gmailConfig(env);
   if (!config) throw new Error("Gmail isn't set up: add GMAIL_ADDRESS and GMAIL_APP_PASSWORD in Vercel.");
-  const raw = buildMessage({ from: config.address, to: input.to, subject: input.subject, text: input.text });
+  const raw = buildMessage({ from: config.from, to: input.to, subject: input.subject, text: input.text });
   const client = factory(config);
   try {
     await client.connect();

@@ -4,7 +4,7 @@ import type { GeminiClient } from "./gemini";
 vi.mock("server-only", () => ({}));
 vi.mock("./visual", () => ({ captureSite: vi.fn(), launchBrowser: vi.fn() }));
 
-let gmail = { configured: true, address: "jake@gmail.com" };
+let gmail: { configured: boolean; address: string | null; from: string | null } = { configured: true, address: "jake@gmail.com", from: "jake@gmail.com" };
 let loginError: Error | null = null;
 vi.mock("./gmail", () => ({
   gmailStatus: () => gmail,
@@ -163,7 +163,7 @@ beforeEach(() => {
   tables.outreach_prospects = [prospect()];
   tables.outreach_searches = [];
   tables.outreach_runs = [];
-  gmail = { configured: true, address: "jake@gmail.com" };
+  gmail = { configured: true, address: "jake@gmail.com", from: "jake@gmail.com" };
   loginError = null;
   nextId = 1;
 });
@@ -294,7 +294,7 @@ describe("runOutreachLoop", () => {
   const ok = { state: "created" as const, costUsd: 0.04 };
 
   it("won't run until Gmail is set up", async () => {
-    gmail = { configured: false, address: null as never };
+    gmail = { configured: false, address: null, from: null };
     const runOne = vi.fn();
     const result = await runOutreachLoop({ trigger: "manual", runOne });
     expect(result.ok).toBe(false);

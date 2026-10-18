@@ -307,7 +307,9 @@ Set up once under **Outreach → Automatic outreach**, then it runs by itself:
 
 **Needs `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD`.** The tool saves drafts over IMAP (`src/lib/gmail.ts`)
 using a Gmail **app password** (myaccount.google.com/apppasswords; needs 2-Step Verification), so there is no
-Google OAuth scope to get approved. Drafts land in that account's Drafts folder. An app password can do more than
+Google OAuth scope to get approved. Drafts land in that account's Drafts folder, and show `GMAIL_ADDRESS` as the sender unless you set
+`OUTREACH_FROM` to one of its aliases (for example `jake@jtbuildsco.com` on a Workspace account whose primary
+domain is another one). An app password can do more than
 drafts, so treat it like a password (revoke it at the same page any time). The code only uses IMAP `LIST` (to
 find the Drafts folder) and `APPEND` (to add a draft), never reads mail and has no SMTP; `gmail.test.ts` fails
 if any code reads a mailbox, sends mail or imports a mail-sending library. Each run first checks that the login

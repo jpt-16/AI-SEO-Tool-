@@ -35,12 +35,12 @@ function fakeImap(options: { folders?: { path: string; specialUse?: string }[]; 
 
 describe("gmailConfig / gmailStatus", () => {
   it("trims the address and strips the spaces Google puts in app passwords", () => {
-    expect(gmailConfig(env)).toEqual({ address: "jake@gmail.com", password: "abcdefghijklmnop" });
-    expect(gmailStatus(env)).toEqual({ configured: true, address: "jake@gmail.com" });
+    expect(gmailConfig(env)).toEqual({ address: "jake@gmail.com", password: "abcdefghijklmnop", from: "jake@gmail.com" });
+    expect(gmailStatus(env)).toEqual({ configured: true, address: "jake@gmail.com", from: "jake@gmail.com" });
   });
 
   it("is not configured without both values", () => {
-    expect(gmailStatus({ GMAIL_ADDRESS: "jake@gmail.com" })).toEqual({ configured: false, address: null });
+    expect(gmailStatus({ GMAIL_ADDRESS: "jake@gmail.com" })).toEqual({ configured: false, address: null, from: null });
     expect(gmailStatus({ GMAIL_APP_PASSWORD: "x" }).configured).toBe(false);
     expect(gmailStatus({}).configured).toBe(false);
   });
@@ -52,7 +52,7 @@ describe("createGmailDraft", () => {
     const draft = await createGmailDraft(input, factory, env);
     expect(draft).toEqual({ id: "7:42" });
     expect(calls.map((c) => c[0])).toEqual(["connect", "list", "append", "logout"]);
-    expect(calls[0][1]).toEqual({ address: "jake@gmail.com", password: "abcdefghijklmnop" });
+    expect(calls[0][1]).toEqual({ address: "jake@gmail.com", password: "abcdefghijklmnop", from: "jake@gmail.com" });
 
     const [, folder, raw, flags] = calls[2] as [string, string, string, string[]];
     expect(folder).toBe("[Gmail]/Drafts");
@@ -61,6 +61,13 @@ describe("createGmailDraft", () => {
     expect(raw).toContain("To: info@smith.example\r\n");
     expect(raw).toMatch(/Subject: =\?UTF-8\?B\?/);
     expect(raw).toContain("Content-Type: text/plain; charset=UTF-8");
+  });
+
+  it("shows OUTREACH_FROM as the sender while saving to the account's own Drafts", async () => {
+    const { calls, factory } = fakeImap();
+    await createGmailDraft(input, factory, { ...env, OUTREACH_FROM: " jake@jtbuildsco.com " });
+    expect((calls[0][1] as { address: string }).address).toBe("jake@gmail.com");
+    expect((calls[2] as unknown[])[2]).toContain("From: jake@jtbuildsco.com\r\n");
   });
 
   it("finds the Drafts folder by its special use, whatever it's called", async () => {

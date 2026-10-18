@@ -47,7 +47,7 @@ export default async function OutreachPage() {
         <p role="status" className={`text-[13px] leading-relaxed ${gmail.configured ? "text-accent-300" : "text-danger"}`}>
           {gmail.configured ? (
             <>
-              Drafts go to {gmail.address}.{" "}
+              Drafts go to {gmail.address}&apos;s Gmail{gmail.from !== gmail.address ? `, from ${gmail.from}` : ""}.{" "}
               <a href="https://mail.google.com/mail/#drafts" target="_blank" rel="noreferrer">Open Gmail drafts</a>
             </>
           ) : (
